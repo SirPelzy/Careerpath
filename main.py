@@ -57,34 +57,6 @@ print("Extensions Initialized.")
 #    return User.query.get(int(user_id))
 # print("User Loader Defined.") # Uncomment when User model and loader are ready
 
-
-# !!!!!! TEMPORARY ROUTE FOR INITIAL DB SETUP - REMOVE IMMEDIATELY AFTER USE !!!!!!
-# --- CHOOSE AND SET YOUR OWN UNIQUE SECRET PATH BELOW ---
-# Replace 'initialize-careerpath-db-x7y3z1q9p0' with your own random string!
-SECRET_DB_INIT_PATH = 'initialize-careerpath-db-x7y3z1q9p0'
-# --- END CHOOSE SECRET PATH ---
-
-@app.route(f'/{SECRET_DB_INIT_PATH}')
-def temp_create_initial_tables():
-    print(f"ACCESSING TEMPORARY DB INIT ROUTE: /{SECRET_DB_INIT_PATH}")
-    try:
-        # Ensure commands run within Flask's application context
-        with app.app_context():
-             print("App context active. Creating all tables based on models.py...")
-             # db should be globally available from its import in main.py
-             # from models import db # Can uncomment if needed, but likely not
-             db.create_all() # Creates tables if they don't exist based on models.py
-             print("db.create_all() command finished.")
-        # Return a success message to the browser
-        return f"OK: db.create_all() executed via /{SECRET_DB_INIT_PATH}. Database tables should be created. Remove this route NOW!", 200
-    except Exception as e:
-        print(f"ERROR during temporary DB init route: {e}")
-         # Return an error message to the browser
-        return f"Error during DB init: {e}", 500
-# !!!!!! END OF TEMPORARY ROUTE - REMEMBER TO REMOVE !!!!!!
-
-
-
 # --- Routes ---
 print("Defining Routes...")
 @app.route('/')
