@@ -10,10 +10,11 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, curren
 from dotenv import load_dotenv
 
 # Import Models (Ensure all required models are listed)
-from models import db, User, CareerPath, Milestone, Step, Resource
+from models import db, User, CareerPath, Milestone, Step, Resource, UserStepStatus # <-- Added UserStepStatus
 
 # Import Forms
 from forms import RegistrationForm, LoginForm, OnboardingForm
+
 
 # Load environment variables from .env file
 load_dotenv()
