@@ -1,0 +1,6 @@
+uploads/
+*.sqlite # If you ever use sqlite locally
+*.db     # If you ever use sqlite locally
+*.pyc
+__pycache__/
+.env
