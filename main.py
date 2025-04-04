@@ -14,6 +14,13 @@ from dotenv import load_dotenv
 # You could generate one using: python -c "import uuid; print(uuid.uuid4())"
 INIT_DB_SECRET_KEY = os.environ.get('INIT_DB_SECRET_KEY', 'replace-this-with-a-very-secret-key')
 
+
+
+# Load environment variables from .env file
+load_dotenv()
+
+app = Flask(__name__)
+
 @app.route(f'/admin/init-db/{INIT_DB_SECRET_KEY}') # Use a secret path
 def init_database():
     """Temporary route to initialize the database."""
@@ -44,11 +51,6 @@ def init_database():
         return f"Error during DB initialization: {e}", 500
 
 # !!! REMEMBER TO REMOVE THIS ROUTE AFTER USE AND REDEPLOY !!!
-
-# Load environment variables from .env file
-load_dotenv()
-
-app = Flask(__name__)
 
 # Configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'fallback_secret_key_for_development')
