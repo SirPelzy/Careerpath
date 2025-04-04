@@ -5,10 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <style>
+      /* Ensure content isn't hidden behind fixed button */
+      body { padding-top: 1rem; } /* Add some top padding */
+      .offcanvas-trigger-btn {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        z-index: 1040; /* Ensure it's above most content but below offcanvas */
+      }
+    </style>
 
     <title>{% block title %}Careerpath!{% endblock %}</title>
   </head>
   <body>
+
+    {# --- Display Old Navbar ONLY on Homepage (or if not logged in) --- #}
+    {# The 'is_homepage' flag is passed from the route #}
+    {% if is_homepage or not current_user.is_authenticated %}
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
       <div class="container-fluid">
         <a class="navbar-brand" href="{{ url_for('home') }}">Careerpath!</a>
@@ -17,35 +33,72 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
           <ul class="navbar-nav ms-auto">
-            <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('home') }}">Home</a>
-            </li>
-            {% if current_user.is_authenticated %}
-              <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
-              </li>
-              {# --- Add this Portfolio Link --- #}
-              <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('portfolio') }}">Portfolio</a>
-              </li>
-              {# --- End Portfolio Link --- #}
-              <li class="nav-item">
-              <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
-              </li>
-            {% else %}
+            {# Public nav items here if needed #}
+            {% if not current_user.is_authenticated %}
               <li class="nav-item">
                 <a class="nav-link" href="{{ url_for('login') }}">Login</a>
               </li>
               <li class="nav-item">
                 <a class="nav-link" href="{{ url_for('register') }}">Register</a>
               </li>
+            {% else %}
+             {# Maybe show dashboard/logout even on homepage if logged in? Optional #}
+             {# <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li> #}
+             {# <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li> #}
             {% endif %}
           </ul>
         </div>
       </div>
     </nav>
+    {% endif %}
+    {# --- End Old Navbar --- #}
 
+
+    {# --- Display Sidebar Trigger Button for Logged-in Users on In-App Pages --- #}
+    {% if current_user.is_authenticated and not is_homepage %}
+    <button class="btn btn-outline-secondary offcanvas-trigger-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasAppMenu" aria-controls="offcanvasAppMenu">
+      <i class="bi bi-list"></i> {# Hamburger Icon #}
+    </button>
+
+    {# --- Offcanvas Sidebar Menu --- #}
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasAppMenu" aria-labelledby="offcanvasAppMenuLabel">
+      <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="offcanvasAppMenuLabel">Menu</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      </div>
+      <div class="offcanvas-body">
+        <ul class="navbar-nav justify-content-end flex-grow-1 pe-3">
+           <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+                <i class="bi bi-speedometer2 me-2"></i>Dashboard
+              </a>
+            </li>
+           <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">
+                 <i class="bi bi-person-circle me-2"></i>Profile
+              </a>
+            </li>
+           <li class="nav-item">
+              <a class="nav-link {% if request.endpoint == 'portfolio' or request.endpoint.startswith('add_portfolio') or request.endpoint.startswith('edit_portfolio') %}active{% endif %}" href="{{ url_for('portfolio') }}">
+                 <i class="bi bi-briefcase-fill me-2"></i>Portfolio
+              </a>
+            </li>
+            {# Add future links here #}
+            <li class="nav-item mt-3 border-top pt-3">
+              <a class="nav-link" href="{{ url_for('logout') }}">
+                 <i class="bi bi-box-arrow-right me-2"></i>Logout
+              </a>
+            </li>
+        </ul>
+      </div>
+    </div>
+    {# --- End Offcanvas --- #}
+    {% endif %}
+
+
+    {# --- Main Page Content --- #}
     <main class="container">
+      {# Flash Messages #}
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           {% for category, message in messages %}
@@ -57,14 +110,19 @@
         {% endif %}
       {% endwith %}
 
+      {# Content Block #}
       {% block content %}{% endblock %}
     </main>
+    {# --- End Main Content --- #}
 
+    {# Footer (Optional) - Keep or remove as desired #}
     <footer class="mt-5 text-center text-muted">
-      <p>&copy; {{ now.year }} Careerpath!</p> </footer>
+      <p>&copy; {{ now.year }} Careerpath!</p>
+    </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 
+    {# Custom JS Block #}
     {% block scripts %}{% endblock %}
   </body>
 </html>
