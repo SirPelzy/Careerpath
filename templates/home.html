@@ -1,10 +1,20 @@
-{% extends "layout.html" %}
+{% extends "base.html" %}
+
+{% block title %}Welcome - Careerpath!{% endblock %}
 
 {% block content %}
-<div class="py-5 text-center">
-    <h1 class="display-4">Welcome to Careerpath!</h1>
-    <p class="lead">Your AI guide to navigating your tech career transition.</p>
-    <p>Content will go here.</p>
-    {# Add Login/Signup buttons or links later #}
-</div>
-{% endblock content %}
+  <div class="px-4 py-5 my-5 text-center">
+    <h1 class="display-5 fw-bold">Welcome to Careerpath!</h1>
+    <div class="col-lg-6 mx-auto">
+      <p class="lead mb-4">Your personalized AI guide to navigating the transition into a tech career. Find clarity, build skills, and land your dream tech job.</p>
+      <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+        {% if current_user.is_authenticated %}
+          <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg px-4 gap-3">Go to Dashboard</a>
+        {% else %}
+          <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg px-4 gap-3">Get Started</a>
+          <a href="{{ url_for('login') }}" class="btn btn-outline-secondary btn-lg px-4">Login</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}
