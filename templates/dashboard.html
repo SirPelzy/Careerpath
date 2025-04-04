@@ -67,6 +67,7 @@
                           {# Display button if step is NOT completed #}
                           <form method="POST" action="{{ url_for('toggle_step_status', step_id=step.id) }}" class="d-inline">
                             {# CSRF token usually handled globally by Flask-WTF #}
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <button type="submit" class="btn btn-sm btn-outline-success py-0" title="Mark as complete">
                                <small>Done?</small>
                             </button>
