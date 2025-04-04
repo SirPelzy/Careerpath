@@ -1,0 +1,17 @@
+{# templates/dashboard_placeholder.html #}
+{% extends "base.html" %}
+
+{% block title %}Dashboard Placeholder{% endblock %}
+
+{% block content %}
+  <h1>Dashboard Placeholder</h1>
+  <p>Welcome, {{ user.first_name if user else 'Guest' }}!</p>
+  <hr>
+  <h2>Debug Info:</h2>
+  <p>Path Object: {{ path }}</p>
+  <p>Path Name: {{ path.name if path else 'N/A' }}</p>
+  <p>Milestones Count: {{ milestones|length }}</p>
+  <p>Timeline Estimate: {{ timeline_estimate }}</p>
+  <hr>
+  <p>(Actual dashboard layout coming soon in dashboard.html)</p>
+{% endblock %}
