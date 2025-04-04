@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 # Generate a unique key once and put it here or in .env
 # You could generate one using: python -c "import uuid; print(uuid.uuid4())"
-INIT_DB_SECRET_KEY = os.environ.get('INIT_DB_SECRET_KEY', 'replace-this-with-a-very-secret-key')
+INIT_DB_SECRET_KEY = os.environ.get('INIT_DB_SECRET_KEY', '112-3344-444fgh-d4dd')
 
 
 
@@ -20,37 +20,6 @@ INIT_DB_SECRET_KEY = os.environ.get('INIT_DB_SECRET_KEY', 'replace-this-with-a-v
 load_dotenv()
 
 app = Flask(__name__)
-
-@app.route(f'/admin/init-db/{INIT_DB_SECRET_KEY}') # Use a secret path
-def init_database():
-    """Temporary route to initialize the database."""
-    print("Attempting to initialize database...")
-    try:
-        with app.app_context():
-            db.create_all()
-            print("Database tables created (or already exist).")
-
-            # Optional: Pre-populate Career Paths (Check if they exist first)
-            if not CareerPath.query.first():
-                print("Populating initial Career Paths...")
-                paths = [
-                    CareerPath(name="Data Analysis / Analytics", description="Focuses on interpreting data, finding insights, and visualization."),
-                    CareerPath(name="UX/UI Design", description="Focuses on user experience and interface design for digital products."),
-                    CareerPath(name="Cybersecurity", description="Focuses on protecting computer systems and networks from threats."),
-                    CareerPath(name="Software Engineering", description="Focuses on designing, developing, and maintaining software systems.")
-                ]
-                db.session.add_all(paths)
-                db.session.commit()
-                print("Career Paths added.")
-            else:
-                 print("Career Paths already exist.")
-
-        return "Database initialization attempted successfully!", 200
-    except Exception as e:
-        print(f"Error during DB initialization: {e}")
-        return f"Error during DB initialization: {e}", 500
-
-# !!! REMEMBER TO REMOVE THIS ROUTE AFTER USE AND REDEPLOY !!!
 
 # Configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'fallback_secret_key_for_development')
@@ -130,6 +99,37 @@ def onboarding():
     if current_user.onboarding_complete:
          return redirect(url_for('dashboard'))
     return "Onboarding Page Placeholder" # Placeholder
+
+@app.route(f'/admin/init-db/{INIT_DB_SECRET_KEY}') # Use a secret path
+def init_database():
+    """Temporary route to initialize the database."""
+    print("Attempting to initialize database...")
+    try:
+        with app.app_context():
+            db.create_all()
+            print("Database tables created (or already exist).")
+
+            # Optional: Pre-populate Career Paths (Check if they exist first)
+            if not CareerPath.query.first():
+                print("Populating initial Career Paths...")
+                paths = [
+                    CareerPath(name="Data Analysis / Analytics", description="Focuses on interpreting data, finding insights, and visualization."),
+                    CareerPath(name="UX/UI Design", description="Focuses on user experience and interface design for digital products."),
+                    CareerPath(name="Cybersecurity", description="Focuses on protecting computer systems and networks from threats."),
+                    CareerPath(name="Software Engineering", description="Focuses on designing, developing, and maintaining software systems.")
+                ]
+                db.session.add_all(paths)
+                db.session.commit()
+                print("Career Paths added.")
+            else:
+                 print("Career Paths already exist.")
+
+        return "Database initialization attempted successfully!", 200
+    except Exception as e:
+        print(f"Error during DB initialization: {e}")
+        return f"Error during DB initialization: {e}", 500
+
+# !!! REMEMBER TO REMOVE THIS ROUTE AFTER USE AND REDEPLOY !!!
 
 
 if __name__ == '__main__':
