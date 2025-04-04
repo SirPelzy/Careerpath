@@ -6,6 +6,7 @@ from flask_wtf.csrf import CSRFProtect
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
 from dotenv import load_dotenv
+import datetime
 # Import models and forms later when created
 # from models import db, User, CareerPath
 # from forms import RegistrationForm, LoginForm, OnboardingForm
@@ -16,6 +17,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+
+@app.context_processor
+def inject_now():
+    return {'now': datetime.datetime.utcnow}
 
 # Configuration
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'fallback_secret_key_for_development')
