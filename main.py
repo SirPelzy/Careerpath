@@ -10,10 +10,6 @@ from dotenv import load_dotenv
 # from models import db, User, CareerPath
 # from forms import RegistrationForm, LoginForm, OnboardingForm
 
-# Generate a unique key once and put it here or in .env
-# You could generate one using: python -c "import uuid; print(uuid.uuid4())"
-INIT_DB_SECRET_KEY = os.environ.get('INIT_DB_SECRET_KEY', '112-3344-444fgh-d4dd')
-
 
 
 # Load environment variables from .env file
@@ -100,11 +96,23 @@ def onboarding():
          return redirect(url_for('dashboard'))
     return "Onboarding Page Placeholder" # Placeholder
 
-@app.route(f'/admin/init-db/{INIT_DB_SECRET_KEY}') # Use a secret path
+# --- <<< PLACE THE TEMPORARY INIT ROUTE HERE >>> ---
+# Generate a unique key once and put it here or better, in your .env file
+# Example: python -c "import uuid; print(uuid.uuid4())"
+INIT_DB_SECRET_KEY = os.environ.get('INIT_DB_SECRET_KEY', 'replace-this-with-a-very-secret-key-3579') # Use a real secret
+
+@app.route(f'/admin/init-db/{INIT_DB_SECRET_KEY}') # Use the secret path
 def init_database():
     """Temporary route to initialize the database."""
+    # IMPORTANT: Check if the key matches if you put it in .env
+    # Example check (if you put the key in .env and want extra safety):
+    # route_key = request.view_args.get('secret_key_from_route') # Need to name it in route decorator
+    # if not route_key or route_key != os.environ.get('INIT_DB_SECRET_KEY'):
+    #     return "Unauthorized", 403 # Or abort(404) to hide endpoint
+
     print("Attempting to initialize database...")
     try:
+        # Use app context to ensure db operations work correctly
         with app.app_context():
             db.create_all()
             print("Database tables created (or already exist).")
@@ -124,12 +132,18 @@ def init_database():
             else:
                  print("Career Paths already exist.")
 
-        return "Database initialization attempted successfully!", 200
+        flash("Database initialization attempted successfully!", 'success')
+        # Maybe redirect somewhere safe afterwards, or just show a message
+        return redirect(url_for('home')) # Redirect home after success
+        # return "Database initialization attempted successfully!", 200
     except Exception as e:
         print(f"Error during DB initialization: {e}")
-        return f"Error during DB initialization: {e}", 500
+        flash(f"Error during DB initialization: {e}", 'danger')
+        # return f"Error during DB initialization: {e}", 500
+        return redirect(url_for('home')) # Redirect home even on error
 
 # !!! REMEMBER TO REMOVE THIS ROUTE AFTER USE AND REDEPLOY !!!
+# --- End of Temporary Init Route ---
 
 
 if __name__ == '__main__':
