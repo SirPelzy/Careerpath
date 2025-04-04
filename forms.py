@@ -1,20 +1,22 @@
 # forms.py
 from flask_wtf import FlaskForm
-# Import FileField and validators
 from flask_wtf.file import FileField, FileAllowed
-# Import fields from WTForms
 from wtforms import StringField, SubmitField, SelectField, TextAreaField
-# Import validators from WTForms
 from wtforms.validators import DataRequired, Length, Optional
-# Import QuerySelectField
 from wtforms_sqlalchemy.fields import QuerySelectField
-# Import User model for validation if needed, and CareerPath for QuerySelectField
 from models import User, CareerPath
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
 # Import the User model to check if email exists during registration
 from models import User
+# Add URL validator, FileField, FileAllowed, Optional, TextAreaField, SelectField if not already imported
+from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileAllowed
+from wtforms import StringField, SubmitField, SelectField, TextAreaField, URLField
+from wtforms.validators import DataRequired, Length, Optional, URL, ValidationError
+# Import PortfolioItem model if needed for validation (not strictly needed here)
+# from models import PortfolioItem
 
 class RegistrationForm(FlaskForm):
     """Form for user registration."""
@@ -122,3 +124,38 @@ class OnboardingForm(FlaskForm):
         ]
     )
     submit = SubmitField('Save Profile & Start Journey')
+
+# --- New Portfolio Item Form ---
+class PortfolioItemForm(FlaskForm):
+    """Form for adding or editing portfolio items."""
+    title = StringField('Title', validators=[DataRequired(), Length(max=200)])
+    description = TextAreaField('Description (Optional)', validators=[Optional(), Length(max=1000)]) # Increased length
+    item_type = SelectField('Item Type', choices=[
+        ('Project', 'Project'),
+        ('Certificate', 'Certificate'),
+        ('Article', 'Article/Blog Post'),
+        ('Presentation', 'Presentation'),
+        ('Other', 'Other')
+    ], validators=[DataRequired()])
+    link_url = URLField('Link URL (e.g., GitHub, Live Demo, Article)', validators=[Optional(), URL(), Length(max=500)])
+    # Use item_file name to avoid clash with model field file_filename
+    item_file = FileField('Upload File (Optional - e.g., Certificate PDF)', validators=[
+        Optional(),
+        FileAllowed(['pdf', 'png', 'jpg', 'jpeg', 'gif', 'docx', 'pptx'], 'Allowed file types: pdf, docx, pptx, png, jpg, gif')
+        # Add file size check in route if needed
+        ])
+    submit = SubmitField('Save Item')
+
+    # Custom validator: Ensure either link_url or item_file is provided
+    def validate(self, extra_validators=None):
+        # Run default validators first
+        initial_validation = super(PortfolioItemForm, self).validate(extra_validators)
+        if not initial_validation:
+            return False
+
+        # Check if at least one of link or file is provided
+        if not self.link_url.data and not self.item_file.data:
+            # Add error to a field (e.g., link_url) or use form-level errors if preferred
+            self.link_url.errors.append('Please provide either a Link URL or upload a File.')
+            return False
+        return True
