@@ -65,51 +65,82 @@ def dashboard():
         flash('Please complete your profile information to get started.', 'info')
         return redirect(url_for('onboarding'))
 
-    # Fetch user's path and milestones
     target_path = current_user.target_career_path
     milestones = []
+    completed_step_ids = set() # Initialize empty set
+    timeline_estimate = "Timeline unavailable" # Default estimate
+
     if target_path:
+        # Fetch milestones for the path
         milestones = Milestone.query.filter_by(career_path_id=target_path.id).order_by(Milestone.sequence).all()
-        # Note: Accessing milestone.steps within the template will trigger lazy loading
 
-    # --- Timeline Estimation Logic (Example - will refine later) ---
-    timeline_estimate = "Timeline calculation coming soon..."
-    if target_path and current_user.time_commitment:
-        try:
-            commitment_str = current_user.time_commitment
-            avg_mins_per_week = 0
-            if commitment_str == '<5 hrs': avg_mins_per_week = 2.5 * 60
-            elif commitment_str == '5-10 hrs': avg_mins_per_week = 7.5 * 60
-            elif commitment_str == '10-15 hrs': avg_mins_per_week = 12.5 * 60
-            elif commitment_str == '15+ hrs': avg_mins_per_week = 20 * 60 # Estimate 20 for 15+
-            else: avg_mins_per_week = 10 * 60 # Default guess
+        # Fetch IDs of steps completed by the user FOR THIS PATH
+        # Get all step ids for the current path first
+        current_path_step_ids_query = Step.query.join(Milestone).filter(
+            Milestone.career_path_id == target_path.id
+        ).with_entities(Step.id) # Select only Step.id
+        current_path_step_ids = {step_id for step_id, in current_path_step_ids_query.all()} # Flatten list of tuples
 
-            if avg_mins_per_week > 0:
-                completed_step_ids = {status.step_id for status in UserStepStatus.query.filter_by(user_id=current_user.id, status='completed').all()}
+        if current_path_step_ids: # Only query statuses if there are steps in the path
+            completed_statuses_query = UserStepStatus.query.filter(
+                UserStepStatus.user_id == current_user.id,
+                UserStepStatus.status == 'completed',
+                UserStepStatus.step_id.in_(current_path_step_ids) # Filter by relevant steps
+            ).with_entities(UserStepStatus.step_id) # Only fetch step_id
+            completed_step_ids = {step_id for step_id, in completed_statuses_query.all()} # Flatten list of tuples
 
-                all_steps_query = Step.query.join(Milestone).filter(Milestone.career_path_id == target_path.id)
-                # Correct way to filter out completed steps using notin_
-                remaining_steps = all_steps_query.filter(Step.id.notin_(completed_step_ids)).all()
+        # --- Timeline Estimation Logic (using fetched completed_step_ids) ---
+        if current_user.time_commitment:
+            try:
+                commitment_str = current_user.time_commitment
+                avg_mins_per_week = 0
+                # (Keep the conversion logic for avg_mins_per_week as before)
+                if commitment_str == '<5 hrs': avg_mins_per_week = 2.5 * 60
+                elif commitment_str == '5-10 hrs': avg_mins_per_week = 7.5 * 60
+                elif commitment_str == '10-15 hrs': avg_mins_per_week = 12.5 * 60
+                elif commitment_str == '15+ hrs': avg_mins_per_week = 20 * 60
+                else: avg_mins_per_week = 10 * 60
 
-                total_remaining_minutes = sum(step.estimated_time_minutes or 0 for step in remaining_steps)
+                if avg_mins_per_week > 0 and current_path_step_ids: # Check if path has steps
+                    # Fetch remaining steps (those in path but not completed)
+                    # No need for separate query, calculate from existing data
+                    remaining_step_ids = current_path_step_ids - completed_step_ids
 
-                if total_remaining_minutes > 0:
-                     estimated_weeks = round(total_remaining_minutes / avg_mins_per_week)
-                     timeline_estimate = f"~ {estimated_weeks} weeks remaining (estimated)"
-                else:
-                     timeline_estimate = "All steps have estimated time 0 or are complete."
-            else:
-                timeline_estimate = "Set weekly time commitment for estimate."
+                    if remaining_step_ids:
+                        # Query only the remaining steps to get their estimated times
+                        remaining_steps_data = Step.query.filter(
+                            Step.id.in_(remaining_step_ids)
+                        ).with_entities(Step.estimated_time_minutes).all()
 
-        except Exception as e:
-            print(f"Error calculating timeline: {e}")
-            timeline_estimate = "Could not calculate timeline."
+                        total_remaining_minutes = sum(time or 0 for time, in remaining_steps_data)
 
-    return render_template('dashboard.html', # Use the new template file
+                        if total_remaining_minutes > 0:
+                            estimated_weeks = round(total_remaining_minutes / avg_mins_per_week)
+                            timeline_estimate = f"~ {estimated_weeks} weeks remaining (estimated)"
+                        else:
+                             timeline_estimate = "Remaining steps have no time estimate."
+                    else: # No remaining step IDs means all are complete
+                        timeline_estimate = "Congratulations! All steps complete."
+                elif not current_path_step_ids:
+                     timeline_estimate = "No steps defined for this path."
+                else: # avg_mins_per_week is 0
+                    timeline_estimate = "Set weekly time commitment for estimate."
+
+            except Exception as e:
+                print(f"Error calculating timeline: {e}")
+                timeline_estimate = "Could not calculate timeline."
+        else: # No time commitment set
+            timeline_estimate = "Set weekly time commitment for estimate."
+
+
+    # --- Render the dashboard template ---
+    return render_template('dashboard.html', # Use the REAL dashboard template now
                            user=current_user,
                            path=target_path,
                            milestones=milestones,
-                           timeline_estimate=timeline_estimate)
+                           timeline_estimate=timeline_estimate,
+                           completed_step_ids=completed_step_ids) # Pass the set of IDs
+
 
 
 # --- Authentication Routes ---
