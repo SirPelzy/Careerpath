@@ -146,3 +146,33 @@ class UserStepStatus(db.Model):
 
     def __repr__(self):
         return f'<UserStepStatus User:{self.user_id} Step:{self.step_id} Status:{self.status}>'
+
+
+class PortfolioItem(db.Model):
+    """Represents an item in a user's portfolio (project, certificate, etc.)."""
+    __tablename__ = 'portfolio_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    # Type: 'Certificate', 'Project', 'Article', 'Blog Post', 'Other'
+    item_type = db.Column(db.String(50), nullable=False, default='Other')
+    # URL for externally hosted items (GitHub repo, live demo, article link)
+    link_url = db.Column(db.String(500), nullable=True)
+    # Filename for internally hosted files (uploaded certificates, project files)
+    # Consider storing in a subdirectory like 'uploads/portfolio/'
+    file_filename = db.Column(db.String(255), nullable=True)
+    # Optional: Link item back to a specific step or milestone completion
+    associated_step_id = db.Column(db.Integer, db.ForeignKey('steps.id'), nullable=True, index=True)
+    associated_milestone_id = db.Column(db.Integer, db.ForeignKey('milestones.id'), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    user = db.relationship('User', backref=db.backref('portfolio_items', lazy='dynamic', cascade="all, delete-orphan"))
+    associated_step = db.relationship('Step', backref='portfolio_items')
+    associated_milestone = db.relationship('Milestone', backref='portfolio_items')
+
+    def __repr__(self):
+        return f'<PortfolioItem {self.id} - {self.title} ({self.user.email})>'
