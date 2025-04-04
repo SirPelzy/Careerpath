@@ -490,6 +490,9 @@ if __name__ == '__main__':
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
         os.makedirs(app.config['UPLOAD_FOLDER'])
     # Use port from environment variable if available (Railway sets PORT)
+    portfolio_upload_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'portfolio')
+    if not os.path.exists(portfolio_upload_dir):
+        os.makedirs(portfolio_upload_dir)
     port = int(os.environ.get('PORT', 5000))
     # Set host to '0.0.0.0' to be accessible externally if needed, not just 127.0.0.1
     app.run(debug=True, host='0.0.0.0', port=port) # Enable debug mode for development
