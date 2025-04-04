@@ -9,3 +9,4 @@ email_validator>=1.1.0  # For email validation in WTForms
 Werkzeug>=2.0.0         # Ensure compatibility
 Jinja2>=3.0.0
 gunicorn
+WTForms-SQLAlchemy>=0.3
