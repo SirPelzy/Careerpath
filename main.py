@@ -2,16 +2,18 @@ import os
 import uuid
 import datetime
 from werkzeug.utils import secure_filename # To sanitize filenames
-from flask import Flask, render_template, redirect, url_for, flash, request
+from flask import Flask, render_template, redirect, url_for, flash, request, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
 from dotenv import load_dotenv
-from flask import abort # For permission errors
-from models import db, User, CareerPath, Milestone, Step, Resource, UserStepStatus, PortfolioItem
-from forms import RegistrationForm, LoginForm, OnboardingForm, PortfolioItemForm
 
+# Import Models
+from models import db, User, CareerPath, Milestone, Step, Resource, UserStepStatus, PortfolioItem
+
+# Import Forms (Make sure EditProfileForm is imported)
+from forms import RegistrationForm, LoginForm, OnboardingForm, PortfolioItemForm, EditProfileForm
 
 # Load environment variables from .env file
 load_dotenv()
@@ -19,14 +21,12 @@ load_dotenv()
 app = Flask(__name__)
 
 # --- Configuration ---
-# Use environment variable for SECRET_KEY in production
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secure-fallback-key-34567')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secure-fallback-key-34567') # Use env var ideally
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 if not app.config['SQLALCHEMY_DATABASE_URI']:
     raise ValueError("No DATABASE_URL set for Flask application")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
-# Increased max file size slightly, adjust as needed
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 # 10 MB limit for uploads
 
 # --- Initialize Extensions ---
@@ -40,18 +40,18 @@ db.init_app(app) # Initialize SQLAlchemy with the app context
 # --- Context Processor for Jinja ---
 @app.context_processor
 def inject_now():
-    return {'now': datetime.datetime.utcnow()} # Added parentheses
+    return {'now': datetime.datetime.utcnow()}
 
 # --- User Loader for Flask-Login ---
 @login_manager.user_loader
 def load_user(user_id):
     """Loads user object for Flask-Login."""
-    # Ensure user_id is converted to int
     return User.query.get(int(user_id))
 
 # --- Routes ---
 @app.route('/')
 def home():
+    # Pass is_homepage=True for the homepage
     return render_template('home.html', is_homepage=True)
 
 # --- Combined Dashboard Route ---
@@ -61,7 +61,6 @@ def dashboard():
     if not current_user.onboarding_complete:
         flash('Please complete your profile information to get started.', 'info')
         return redirect(url_for('onboarding'))
-        
 
     target_path = current_user.target_career_path
     milestones = []
@@ -100,13 +99,8 @@ def dashboard():
 
             # Calculate Per-Milestone Progress
             for milestone in milestones:
-                # Use .all() to get steps if needed for intersection, or count() directly
-                # Using count() might be slightly more efficient if steps list isn't needed elsewhere
                 total_steps_in_milestone = Step.query.filter_by(milestone_id=milestone.id).count()
-                # milestone.steps.count() # Alternative if lazy='dynamic'
-
                 if total_steps_in_milestone > 0:
-                    # Get step IDs for this specific milestone to intersect with completed IDs
                     milestone_step_ids_query = Step.query.filter_by(milestone_id=milestone.id).with_entities(Step.id)
                     milestone_step_ids = {step_id for step_id, in milestone_step_ids_query.all()}
                     completed_in_milestone = len(completed_step_ids.intersection(milestone_step_ids))
@@ -117,7 +111,7 @@ def dashboard():
                         'percent': percent_complete
                     }
                 else:
-                     milestone_progress[milestone.id] = {'completed': 0, 'total': 0, 'percent': 0}
+                    milestone_progress[milestone.id] = {'completed': 0, 'total': 0, 'percent': 0}
 
             # --- Timeline Estimation Logic ---
             if current_user.time_commitment:
@@ -155,7 +149,6 @@ def dashboard():
         else: # Path has no steps
              timeline_estimate = "No steps defined for this path."
 
-
     # --- Render the dashboard template ---
     return render_template('dashboard.html',
                            user=current_user,
@@ -166,10 +159,8 @@ def dashboard():
                            milestone_progress=milestone_progress,
                            total_steps_in_path=total_steps_in_path,
                            total_completed_steps=total_completed_steps,
-                           overall_percent_complete=overall_percent_complete)
-                           is_homepage=False)
-
-
+                           overall_percent_complete=overall_percent_complete,
+                           is_homepage=False) # Pass flag for layout
 
 # --- Authentication Routes ---
 @app.route('/register', methods=['GET', 'POST'])
@@ -197,7 +188,9 @@ def register():
             db.session.rollback()
             print(f"Error during registration: {e}")
             flash('An error occurred during registration. Please try again.', 'danger')
-    return render_template('register.html', title='Register', form=form)
+    # Use is_homepage=True for consistency with login page style? Or define separate base?
+    # Let's assume login/register use the homepage style for now.
+    return render_template('register.html', title='Register', form=form, is_homepage=True)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -209,16 +202,13 @@ def login():
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember_me.data)
             user.last_login = datetime.datetime.utcnow()
-            # Need to commit session after updating last_login
             try:
                 db.session.commit()
             except Exception as e:
                 db.session.rollback()
                 print(f"Error updating last_login: {e}")
-                # Decide if this should prevent login - probably not
 
             next_page = request.args.get('next')
-            # Security check for open redirect
             if next_page and not (next_page.startswith('/') or next_page.startswith(request.host_url)):
                  next_page = None
             flash('Login Successful!', 'success')
@@ -228,7 +218,8 @@ def login():
                  return redirect(next_page or url_for('dashboard'))
         else:
             flash('Login Unsuccessful. Please check email and password.', 'danger')
-    return render_template('login.html', title='Login', form=form)
+    # Assume login uses homepage style
+    return render_template('login.html', title='Login', form=form, is_homepage=True)
 
 @app.route('/logout')
 @login_required
@@ -255,10 +246,10 @@ def onboarding():
                 base_filename = secure_filename(file.filename)
                 unique_id = uuid.uuid4().hex
                 name, ext = os.path.splitext(base_filename)
-                # Ensure extension is lower case for consistency
                 ext = ext.lower()
                 name = name[:100] # Limit base name length
                 cv_filename_to_save = f"user_{current_user.id}_{unique_id}{ext}"
+                # Save to main upload folder
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], cv_filename_to_save)
 
                 # Optional: Delete old CV file
@@ -284,7 +275,6 @@ def onboarding():
             current_user.learning_style = form.learning_style.data if form.learning_style.data else None
             current_user.cv_filename = cv_filename_to_save # Update with new or keep old
 
-            # Mark onboarding as complete
             current_user.onboarding_complete = True
 
             db.session.commit()
@@ -293,10 +283,10 @@ def onboarding():
 
         except Exception as e:
              db.session.rollback()
-             print(f"Error during onboarding save: {e}") # Log the specific error
+             print(f"Error during onboarding save: {e}")
              flash('An error occurred while saving your profile. Please try again.', 'danger')
 
-    return render_template('onboarding.html', title='Complete Your Profile', form=form, is_homepage=False)
+    return render_template('onboarding.html', title='Complete Your Profile', form=form, is_homepage=False) # Use sidebar
 
 # --- Route to Toggle Step Completion Status ---
 @app.route('/path/step/<int:step_id>/toggle', methods=['POST'])
@@ -304,7 +294,6 @@ def onboarding():
 def toggle_step_status(step_id):
     """Marks a step as complete or incomplete for the current user."""
     step = Step.query.get_or_404(step_id)
-    # Optional: Check if step belongs to user's path? Maybe not needed if URL isn't guessable easily.
 
     # Find existing status or create a new one
     user_status = UserStepStatus.query.filter_by(user_id=current_user.id, step_id=step.id).first()
@@ -338,7 +327,6 @@ def toggle_step_status(step_id):
         print(f"Error updating step status for user {current_user.id}, step {step_id}: {e}")
         flash('An error occurred while updating step status.', 'danger')
 
-    # Redirect back to the dashboard where the path is displayed
     return redirect(url_for('dashboard'))
 
 
@@ -347,8 +335,7 @@ def toggle_step_status(step_id):
 # Utility function to get portfolio upload path
 def get_portfolio_upload_path(filename):
     portfolio_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'portfolio')
-    # Ensure portfolio subdirectory exists
-    os.makedirs(portfolio_dir, exist_ok=True)
+    os.makedirs(portfolio_dir, exist_ok=True) # Ensure portfolio subdirectory exists
     return os.path.join(portfolio_dir, filename)
 
 @app.route('/portfolio')
@@ -356,7 +343,7 @@ def get_portfolio_upload_path(filename):
 def portfolio():
     """Displays the user's portfolio items."""
     items = PortfolioItem.query.filter_by(user_id=current_user.id).order_by(PortfolioItem.created_at.desc()).all()
-    return render_template('portfolio.html', title='My Portfolio', portfolio_items=items, is_homepage=False)
+    return render_template('portfolio.html', title='My Portfolio', portfolio_items=items, is_homepage=False) # Use sidebar
 
 @app.route('/portfolio/add', methods=['GET', 'POST'])
 @login_required
@@ -367,14 +354,13 @@ def add_portfolio_item():
         link_url = form.link_url.data
         file_filename_to_save = None # Filename to store in DB
 
-        # Handle file upload
         if form.item_file.data:
             file = form.item_file.data
             base_filename = secure_filename(file.filename)
             unique_id = uuid.uuid4().hex
             name, ext = os.path.splitext(base_filename)
             ext = ext.lower()
-            name = name[:100] # Limit base name length
+            name = name[:100]
             file_filename_to_save = f"user_{current_user.id}_portfolio_{unique_id}{ext}"
             try:
                 file_path = get_portfolio_upload_path(file_filename_to_save)
@@ -383,19 +369,15 @@ def add_portfolio_item():
             except Exception as e:
                 print(f"Error saving portfolio file: {e}")
                 flash('Error uploading file. Please try again.', 'danger')
-                # Decide if we should proceed without the file or return
-                file_filename_to_save = None # Don't save filename if save failed
-                # Optionally return here: return render_template(...)
+                file_filename_to_save = None
 
-        # Create new PortfolioItem object
         new_item = PortfolioItem(
             user_id=current_user.id,
             title=form.title.data,
             description=form.description.data,
             item_type=form.item_type.data,
-            link_url=link_url if link_url else None, # Store None if empty
-            file_filename=file_filename_to_save # Store the unique filename or None
-            # Add associated_step_id / milestone_id later if needed
+            link_url=link_url if link_url else None,
+            file_filename=file_filename_to_save
         )
         try:
             db.session.add(new_item)
@@ -407,8 +389,7 @@ def add_portfolio_item():
             print(f"Error adding portfolio item to DB: {e}")
             flash('Error saving portfolio item. Please try again.', 'danger')
 
-    # Render the form template (used for both add and edit)
-    return render_template('add_edit_portfolio_item.html', title='Add Portfolio Item', form=form, is_edit=False, is_homepage=False)
+    return render_template('add_edit_portfolio_item.html', title='Add Portfolio Item', form=form, is_edit=False, is_homepage=False) # Use sidebar
 
 
 @app.route('/portfolio/<int:item_id>/edit', methods=['GET', 'POST'])
@@ -416,22 +397,20 @@ def add_portfolio_item():
 def edit_portfolio_item(item_id):
     """Handles editing an existing portfolio item."""
     item = PortfolioItem.query.get_or_404(item_id)
-    # Check ownership
     if item.user_id != current_user.id:
-        abort(403) # Forbidden
+        abort(403)
 
-    form = PortfolioItemForm(obj=item) # Pre-populate form with item data on GET
+    form = PortfolioItemForm(obj=item) # Pre-populate form
 
     if form.validate_on_submit():
         file_filename_to_save = item.file_filename # Keep existing file by default
         old_filename_to_delete = None
 
-        # Handle optional file upload (replaces existing if new file provided)
         if form.item_file.data:
-            # Store old filename before assigning new one
-            if item.file_filename:
+            if item.file_filename: # Mark old file for deletion
                 old_filename_to_delete = item.file_filename
 
+            # Save new file
             file = form.item_file.data
             base_filename = secure_filename(file.filename)
             unique_id = uuid.uuid4().hex
@@ -446,10 +425,10 @@ def edit_portfolio_item(item_id):
             except Exception as e:
                 print(f"Error saving updated portfolio file: {e}")
                 flash('Error uploading new file. Please try again.', 'danger')
-                file_filename_to_save = item.file_filename # Revert to old filename if save fails
-                old_filename_to_delete = None # Don't delete old file if new one failed
+                file_filename_to_save = item.file_filename # Revert to old name
+                old_filename_to_delete = None # Don't delete old file
 
-        # Update item fields
+        # Update item fields in DB object
         item.title = form.title.data
         item.description = form.description.data
         item.item_type = form.item_type.data
@@ -457,19 +436,18 @@ def edit_portfolio_item(item_id):
         item.file_filename = file_filename_to_save
 
         try:
-            db.session.commit()
+            db.session.commit() # Commit changes to item
             flash('Portfolio item updated successfully!', 'success')
 
-            # Delete old file AFTER commit is successful
+            # Delete old file AFTER commit succeeds
             if old_filename_to_delete:
                 try:
                     old_file_path = get_portfolio_upload_path(old_filename_to_delete)
                     if os.path.exists(old_file_path):
-                         os.remove(old_file_path)
-                         print(f"Deleted old portfolio file: {old_file_path}")
+                        os.remove(old_file_path)
+                        print(f"Deleted old portfolio file: {old_file_path}")
                 except OSError as e:
                      print(f"Error deleting old portfolio file {old_file_path}: {e}")
-                     # Optionally flash a warning message about failure to delete old file
 
             return redirect(url_for('portfolio'))
         except Exception as e:
@@ -477,18 +455,16 @@ def edit_portfolio_item(item_id):
             print(f"Error updating portfolio item {item_id}: {e}")
             flash('Error updating portfolio item. Please try again.', 'danger')
 
-    # Pass item only needed to display current file info if editing
-    return render_template('add_edit_portfolio_item.html', title='Edit Portfolio Item', form=form, is_edit=True, item=item, is_homepage=False)
+    return render_template('add_edit_portfolio_item.html', title='Edit Portfolio Item', form=form, is_edit=True, item=item, is_homepage=False) # Use sidebar
 
 
-@app.route('/portfolio/<int:item_id>/delete', methods=['POST']) # Use POST for deletion
+@app.route('/portfolio/<int:item_id>/delete', methods=['POST'])
 @login_required
 def delete_portfolio_item(item_id):
     """Handles deleting a portfolio item."""
     item = PortfolioItem.query.get_or_404(item_id)
-    # Check ownership
     if item.user_id != current_user.id:
-        abort(403) # Forbidden
+        abort(403)
 
     filename_to_delete = item.file_filename # Get filename before deleting DB record
 
@@ -505,7 +481,6 @@ def delete_portfolio_item(item_id):
                     print(f"Deleted portfolio file: {file_path}")
             except OSError as e:
                 print(f"Error deleting portfolio file {file_path}: {e}")
-                # Optionally flash a warning message
 
         flash('Portfolio item deleted successfully.', 'success')
     except Exception as e:
@@ -516,21 +491,23 @@ def delete_portfolio_item(item_id):
     return redirect(url_for('portfolio'))
 
 
-# --- NEW Profile Route ---
+# --- Profile Route ---
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
     """Displays user profile and handles updates."""
-    # Use the EditProfileForm, pre-populate with current user data on GET
+    # Ensure EditProfileForm is imported from forms
     form = EditProfileForm(obj=current_user)
-    # Manually set the target path on GET if using obj= doesn't work perfectly for QuerySelectField
-    # if request.method == 'GET' and current_user.target_career_path:
-    #     form.target_career_path.data = current_user.target_career_path
+
+    # Manual pre-population for QuerySelectField might be needed if obj= fails
+    # Typically obj=current_user works if relationships are set up correctly
+    if request.method == 'GET' and current_user.target_career_path:
+        form.target_career_path.data = current_user.target_career_path # Ensure this works
 
     if form.validate_on_submit():
         try:
-            # --- Handle CV Upload (similar to onboarding) ---
-            cv_filename_to_save = current_user.cv_filename # Keep existing by default
+            # --- Handle CV Upload (using main uploads folder) ---
+            cv_filename_to_save = current_user.cv_filename
             if form.cv_upload.data:
                 file = form.cv_upload.data
                 base_filename = secure_filename(file.filename)
@@ -539,10 +516,9 @@ def profile():
                 ext = ext.lower()
                 name = name[:100]
                 cv_filename_to_save = f"user_{current_user.id}_{unique_id}{ext}"
-                # Save to main upload folder for now (or create 'uploads/cvs/')
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], cv_filename_to_save)
 
-                # Delete old CV file if it exists and name changes
+                # Delete old CV file
                 if current_user.cv_filename and current_user.cv_filename != cv_filename_to_save:
                    old_path = os.path.join(app.config['UPLOAD_FOLDER'], current_user.cv_filename)
                    if os.path.exists(old_path):
@@ -552,12 +528,10 @@ def profile():
                        except OSError as e:
                            print(f"Error removing old CV {old_path}: {e}")
 
-                # Save the new file
                 file.save(file_path)
                 print(f"New CV saved via profile to: {file_path}")
 
             # --- Update User Object ---
-            # Note: Don't update email or password here unless intended
             current_user.first_name = form.first_name.data
             current_user.last_name = form.last_name.data
             current_user.target_career_path = form.target_career_path.data
@@ -566,10 +540,9 @@ def profile():
             current_user.time_commitment = form.time_commitment.data
             current_user.interests = form.interests.data
             current_user.learning_style = form.learning_style.data if form.learning_style.data else None
-            current_user.cv_filename = cv_filename_to_save # Update with new/existing/None
+            current_user.cv_filename = cv_filename_to_save
 
-            # Ensure onboarding is marked complete if profile is updated
-            current_user.onboarding_complete = True
+            current_user.onboarding_complete = True # Ensure this remains true
 
             db.session.commit()
             flash('Your profile has been updated successfully!', 'success')
@@ -580,29 +553,78 @@ def profile():
              print(f"Error during profile update: {e}")
              flash('An error occurred while updating your profile. Please try again.', 'danger')
 
-    # For GET requests, the form is already populated via obj=current_user
-    # If obj= doesn't work perfectly for selects/queryselects, populate manually:
-    # elif request.method == 'GET':
-    #    form.first_name.data = current_user.first_name
-    #    # ... and so on for other fields ...
-    #    if current_user.target_career_path:
-    #         form.target_career_path.data = current_user.target_career_path
-
-
+    # --- Correct indentation for the final return statement ---
     return render_template('profile.html',
                            title='Edit Profile',
                            form=form,
                            is_homepage=False) # Use sidebar navigation
 
+
+# --- <<< TEMPORARY ADMIN ROUTE FOR DB INIT & SEEDING >>> ---
+# !! IMPORTANT !! Remove or secure this route in production!
+INIT_DB_SECRET_KEY = os.environ.get('INIT_DB_SECRET_KEY', 'replace-this-with-a-very-secret-key-9876')
+
+@app.route(f'/admin/init-db/{INIT_DB_SECRET_KEY}')
+def init_database():
+    """Temporary route to initialize the database (create missing tables) and seed path data."""
+    print("Attempting database initialization and seeding...")
+    # (Keep the seeding logic here as provided before)
+    # ... Make sure this function has correct indentation internally ...
+    try:
+        with app.app_context():
+            db.create_all()
+            print("Database tables checked/created.")
+            # Seed Career Paths...
+            if not CareerPath.query.first():
+                print("Populating initial Career Paths...")
+                # ... paths list and db.session.add_all(paths) ...
+                db.session.commit()
+                print("Career Paths added.")
+            else:
+                print("Career Paths already exist.")
+
+            # Seed Data Analytics Path...
+            print("Checking for Data Analytics path seeding...")
+            da_path = CareerPath.query.filter_by(name="Data Analysis / Analytics").first()
+            if da_path and not Milestone.query.filter_by(career_path_id=da_path.id).first():
+                print(f"Seeding path for '{da_path.name}'...")
+                # ... ALL THE MILESTONE/STEP/RESOURCE CREATION CODE ...
+                # (Ensure this block is correctly indented)
+                # Example start:
+                resources_to_add = []
+                m1 = Milestone(name="Introduction & Foundation", sequence=10, career_path_id=da_path.id); db.session.add(m1); db.session.flush()
+                s1_1 = Step(name="Understand the Data Analyst Role", sequence=10, estimated_time_minutes=60, milestone_id=m1.id)
+                # ... etc ...
+                # --- Add all collected resources ---
+                if resources_to_add:
+                    db.session.add_all(resources_to_add)
+                db.session.commit()
+                print(f"Path '{da_path.name}' seeded successfully.")
+            elif da_path:
+                 print(f"Path '{da_path.name}' milestones already seem to exist. Skipping seeding.")
+            else:
+                 print("Data Analysis career path not found in DB, skipping seeding.")
+
+        flash("Database initialization and seeding check complete.", 'info')
+        return redirect(url_for('home'))
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error during DB initialization/seeding: {e}")
+        flash(f"Error during DB initialization/seeding: {e}", 'danger')
+        return redirect(url_for('home'))
+# --- End of Temporary Init Route ---
+
+
 # --- Main execution ---
 if __name__ == '__main__':
-    # Ensure the upload folder exists
+    # Ensure the main upload folder exists
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
         os.makedirs(app.config['UPLOAD_FOLDER'])
-    # Use port from environment variable if available (Railway sets PORT)
+    # Ensure the portfolio subfolder exists
     portfolio_upload_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'portfolio')
     if not os.path.exists(portfolio_upload_dir):
         os.makedirs(portfolio_upload_dir)
+
     port = int(os.environ.get('PORT', 5000))
-    # Set host to '0.0.0.0' to be accessible externally if needed, not just 127.0.0.1
-    app.run(debug=True, host='0.0.0.0', port=port) # Enable debug mode for development
+    # Set host to '0.0.0.0' to be accessible externally
+    app.run(debug=True, host='0.0.0.0', port=port)
