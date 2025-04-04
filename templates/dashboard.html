@@ -54,19 +54,25 @@
                         {% endif %}
                       </div>
                       {# Area for completion status/button #}
-                      <span class="badge bg-light text-dark ms-2"> {# Added margin start #}
-                        {# Completion Status Logic (currently commented out - for next step) #}
-                        {# {% if step.id in completed_step_ids %} #}
-                        {#     <span class="badge bg-success">Completed</span> #}
-                        {# {% else %} #}
+                      <span class="badge bg-light text-dark ms-2 align-self-center"> {# Aligned item center vertically #}
+                        {# --- Conditional logic for status --- #}
+                        {% if step.id in completed_step_ids %}
+                          {# Display if step is completed #}
+                          <span class="text-success fw-bold">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-circle-fill me-1" viewBox="0 0 16 16" style="vertical-align: -0.125em;"> {# Adjusted alignment #}
+                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                              </svg>Completed
+                          </span>
+                        {% else %}
+                          {# Display button if step is NOT completed #}
                           <form method="POST" action="{{ url_for('toggle_step_status', step_id=step.id) }}" class="d-inline">
-                            {# CSRF token usually handled globally by Flask-WTF if configured #}
-                            {# <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/> #}
+                            {# CSRF token usually handled globally by Flask-WTF #}
                             <button type="submit" class="btn btn-sm btn-outline-success py-0" title="Mark as complete">
                                <small>Done?</small>
                             </button>
                           </form>
-                        {# {% endif %} #}
+                        {% endif %}
+                        {# --- End conditional logic --- #}
                       </span>
                     </li>
                   {% else %}
