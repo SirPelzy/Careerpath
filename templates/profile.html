@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Your Profile - Careerpath!{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-7">
+    <h2>Your Profile</h2>
+    <p class="lead">View and update your information.</p>
+
+    {# Display some info read-only #}
+    <div class="mb-3">
+        <label class="form-label">Email Address</label>
+        <input type="email" class="form-control" value="{{ current_user.email }}" readonly disabled>
+        <div class="form-text">Your email address cannot be changed here.</div>
+    </div>
+    <hr>
+
+    {# --- Edit Profile Form --- #}
+    <form method="POST" action="" enctype="multipart/form-data" novalidate>
+      {{ form.hidden_tag() }} <div class="row">
+        <div class="col-md-6 mb-3">
+            {{ form.first_name.label(class="form-label") }}
+            {{ form.first_name(class="form-control" + (" is-invalid" if form.first_name.errors else "")) }}
+            {% if form.first_name.errors %}
+              <div class="invalid-feedback">
+                {% for error in form.first_name.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+        </div>
+        <div class="col-md-6 mb-3">
+            {{ form.last_name.label(class="form-label") }}
+            {{ form.last_name(class="form-control" + (" is-invalid" if form.last_name.errors else "")) }}
+            {% if form.last_name.errors %}
+              <div class="invalid-feedback">
+                {% for error in form.last_name.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+        </div>
+      </div>
+
+      <div class="mb-3">
+        {{ form.target_career_path.label(class="form-label") }}
+        {{ form.target_career_path(class="form-select" + (" is-invalid" if form.target_career_path.errors else "")) }}
+        {% if form.target_career_path.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.target_career_path.errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        {{ form.current_role.label(class="form-label") }}
+        {{ form.current_role(class="form-control" + (" is-invalid" if form.current_role.errors else "")) }}
+        {% if form.current_role.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.current_role.errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        {{ form.employment_status.label(class="form-label") }}
+        {{ form.employment_status(class="form-select" + (" is-invalid" if form.employment_status.errors else "")) }}
+        {% if form.employment_status.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.employment_status.errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        {{ form.time_commitment.label(class="form-label") }}
+        {{ form.time_commitment(class="form-select" + (" is-invalid" if form.time_commitment.errors else "")) }}
+        {% if form.time_commitment.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.time_commitment.errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        {{ form.interests.label(class="form-label") }}
+        {{ form.interests(class="form-control" + (" is-invalid" if form.interests.errors else ""), rows="3") }}
+        {% if form.interests.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.interests.errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+       <div class="mb-3">
+        {{ form.learning_style.label(class="form-label") }}
+        {{ form.learning_style(class="form-select" + (" is-invalid" if form.learning_style.errors else "")) }}
+        {% if form.learning_style.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.learning_style.errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <hr>
+      {# CV Management Section #}
+      <div class="mb-3">
+        <label class="form-label">Current CV/Resume</label>
+        {% if current_user.cv_filename %}
+          <div class="alert alert-secondary py-2">
+             {{ current_user.cv_filename }}
+             {# TODO: Add download link later #}
+          </div>
+        {% else %}
+          <div class="alert alert-secondary py-2">No CV uploaded.</div>
+        {% endif %}
+        {{ form.cv_upload.label(class="form-label") }}
+        {{ form.cv_upload(class="form-control" + (" is-invalid" if form.cv_upload.errors else "")) }}
+         {% if form.cv_upload.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.cv_upload.errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+      </div>
+      {# End CV Section #}
+      <hr>
+
+      <div class="d-grid">
+         {{ form.submit(class="btn btn-primary") }}
+      </div>
+    </form>
+
+    {# Add Password Change section later if needed #}
+
+  </div>
+</div>
+{% endblock %}
