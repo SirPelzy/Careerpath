@@ -515,6 +515,85 @@ def delete_portfolio_item(item_id):
 
     return redirect(url_for('portfolio'))
 
+
+# --- NEW Profile Route ---
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    """Displays user profile and handles updates."""
+    # Use the EditProfileForm, pre-populate with current user data on GET
+    form = EditProfileForm(obj=current_user)
+    # Manually set the target path on GET if using obj= doesn't work perfectly for QuerySelectField
+    # if request.method == 'GET' and current_user.target_career_path:
+    #     form.target_career_path.data = current_user.target_career_path
+
+    if form.validate_on_submit():
+        try:
+            # --- Handle CV Upload (similar to onboarding) ---
+            cv_filename_to_save = current_user.cv_filename # Keep existing by default
+            if form.cv_upload.data:
+                file = form.cv_upload.data
+                base_filename = secure_filename(file.filename)
+                unique_id = uuid.uuid4().hex
+                name, ext = os.path.splitext(base_filename)
+                ext = ext.lower()
+                name = name[:100]
+                cv_filename_to_save = f"user_{current_user.id}_{unique_id}{ext}"
+                # Save to main upload folder for now (or create 'uploads/cvs/')
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], cv_filename_to_save)
+
+                # Delete old CV file if it exists and name changes
+                if current_user.cv_filename and current_user.cv_filename != cv_filename_to_save:
+                   old_path = os.path.join(app.config['UPLOAD_FOLDER'], current_user.cv_filename)
+                   if os.path.exists(old_path):
+                       try:
+                           os.remove(old_path)
+                           print(f"Removed old CV during profile update: {old_path}")
+                       except OSError as e:
+                           print(f"Error removing old CV {old_path}: {e}")
+
+                # Save the new file
+                file.save(file_path)
+                print(f"New CV saved via profile to: {file_path}")
+
+            # --- Update User Object ---
+            # Note: Don't update email or password here unless intended
+            current_user.first_name = form.first_name.data
+            current_user.last_name = form.last_name.data
+            current_user.target_career_path = form.target_career_path.data
+            current_user.current_role = form.current_role.data
+            current_user.employment_status = form.employment_status.data
+            current_user.time_commitment = form.time_commitment.data
+            current_user.interests = form.interests.data
+            current_user.learning_style = form.learning_style.data if form.learning_style.data else None
+            current_user.cv_filename = cv_filename_to_save # Update with new/existing/None
+
+            # Ensure onboarding is marked complete if profile is updated
+            current_user.onboarding_complete = True
+
+            db.session.commit()
+            flash('Your profile has been updated successfully!', 'success')
+            return redirect(url_for('profile')) # Redirect back to profile page
+
+        except Exception as e:
+             db.session.rollback()
+             print(f"Error during profile update: {e}")
+             flash('An error occurred while updating your profile. Please try again.', 'danger')
+
+    # For GET requests, the form is already populated via obj=current_user
+    # If obj= doesn't work perfectly for selects/queryselects, populate manually:
+    # elif request.method == 'GET':
+    #    form.first_name.data = current_user.first_name
+    #    # ... and so on for other fields ...
+    #    if current_user.target_career_path:
+    #         form.target_career_path.data = current_user.target_career_path
+
+
+    return render_template('profile.html',
+                           title='Edit Profile',
+                           form=form,
+                           is_homepage=False) # Use sidebar navigation
+
 # --- Main execution ---
 if __name__ == '__main__':
     # Ensure the upload folder exists
