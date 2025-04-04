@@ -54,7 +54,7 @@ def load_user(user_id):
 def home():
     return render_template('home.html')
 
-# --- Dashboard Route ---
+# --- Combined Dashboard Route ---
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -64,79 +64,108 @@ def dashboard():
 
     target_path = current_user.target_career_path
     milestones = []
-    completed_step_ids = set() # Initialize empty set
-    timeline_estimate = "Timeline unavailable" # Default estimate
+    completed_step_ids = set()
+    milestone_progress = {}
+    timeline_estimate = "Timeline unavailable"
+    # Overall Metrics
+    total_steps_in_path = 0
+    total_completed_steps = 0
+    overall_percent_complete = 0
 
     if target_path:
-        # Fetch milestones for the path
+        # Fetch milestones ordered by sequence
         milestones = Milestone.query.filter_by(career_path_id=target_path.id).order_by(Milestone.sequence).all()
 
-        # Fetch IDs of steps completed by the user FOR THIS PATH
-        # Get all step ids for the current path first
+        # Get all Step IDs for the user's current path
         current_path_step_ids_query = Step.query.join(Milestone).filter(
             Milestone.career_path_id == target_path.id
-        ).with_entities(Step.id) # Select only Step.id
-        current_path_step_ids = {step_id for step_id, in current_path_step_ids_query.all()} # Flatten list of tuples
+        ).with_entities(Step.id)
+        current_path_step_ids = {step_id for step_id, in current_path_step_ids_query.all()}
+        total_steps_in_path = len(current_path_step_ids)
 
-        if current_path_step_ids: # Only query statuses if there are steps in the path
+        if current_path_step_ids: # Only proceed if the path has steps
+            # Get IDs of completed steps for the user within this path
             completed_statuses_query = UserStepStatus.query.filter(
                 UserStepStatus.user_id == current_user.id,
                 UserStepStatus.status == 'completed',
-                UserStepStatus.step_id.in_(current_path_step_ids) # Filter by relevant steps
-            ).with_entities(UserStepStatus.step_id) # Only fetch step_id
-            completed_step_ids = {step_id for step_id, in completed_statuses_query.all()} # Flatten list of tuples
+                UserStepStatus.step_id.in_(current_path_step_ids)
+            ).with_entities(UserStepStatus.step_id)
+            completed_step_ids = {step_id for step_id, in completed_statuses_query.all()}
+            total_completed_steps = len(completed_step_ids)
 
-        # --- Timeline Estimation Logic (using fetched completed_step_ids) ---
-        if current_user.time_commitment:
-            try:
-                commitment_str = current_user.time_commitment
-                avg_mins_per_week = 0
-                # (Keep the conversion logic for avg_mins_per_week as before)
-                if commitment_str == '<5 hrs': avg_mins_per_week = 2.5 * 60
-                elif commitment_str == '5-10 hrs': avg_mins_per_week = 7.5 * 60
-                elif commitment_str == '10-15 hrs': avg_mins_per_week = 12.5 * 60
-                elif commitment_str == '15+ hrs': avg_mins_per_week = 20 * 60
-                else: avg_mins_per_week = 10 * 60
+            # Calculate Overall Progress Percentage
+            if total_steps_in_path > 0:
+                overall_percent_complete = round((total_completed_steps / total_steps_in_path) * 100)
 
-                if avg_mins_per_week > 0 and current_path_step_ids: # Check if path has steps
-                    # Fetch remaining steps (those in path but not completed)
-                    # No need for separate query, calculate from existing data
-                    remaining_step_ids = current_path_step_ids - completed_step_ids
+            # Calculate Per-Milestone Progress
+            for milestone in milestones:
+                # Use .all() to get steps if needed for intersection, or count() directly
+                # Using count() might be slightly more efficient if steps list isn't needed elsewhere
+                total_steps_in_milestone = Step.query.filter_by(milestone_id=milestone.id).count()
+                # milestone.steps.count() # Alternative if lazy='dynamic'
 
-                    if remaining_step_ids:
-                        # Query only the remaining steps to get their estimated times
-                        remaining_steps_data = Step.query.filter(
-                            Step.id.in_(remaining_step_ids)
-                        ).with_entities(Step.estimated_time_minutes).all()
+                if total_steps_in_milestone > 0:
+                    # Get step IDs for this specific milestone to intersect with completed IDs
+                    milestone_step_ids_query = Step.query.filter_by(milestone_id=milestone.id).with_entities(Step.id)
+                    milestone_step_ids = {step_id for step_id, in milestone_step_ids_query.all()}
+                    completed_in_milestone = len(completed_step_ids.intersection(milestone_step_ids))
+                    percent_complete = round((completed_in_milestone / total_steps_in_milestone) * 100)
+                    milestone_progress[milestone.id] = {
+                        'completed': completed_in_milestone,
+                        'total': total_steps_in_milestone,
+                        'percent': percent_complete
+                    }
+                else:
+                     milestone_progress[milestone.id] = {'completed': 0, 'total': 0, 'percent': 0}
 
-                        total_remaining_minutes = sum(time or 0 for time, in remaining_steps_data)
+            # --- Timeline Estimation Logic ---
+            if current_user.time_commitment:
+                try:
+                    commitment_str = current_user.time_commitment
+                    avg_mins_per_week = 0
+                    if commitment_str == '<5 hrs': avg_mins_per_week = 2.5 * 60
+                    elif commitment_str == '5-10 hrs': avg_mins_per_week = 7.5 * 60
+                    elif commitment_str == '10-15 hrs': avg_mins_per_week = 12.5 * 60
+                    elif commitment_str == '15+ hrs': avg_mins_per_week = 20 * 60
+                    else: avg_mins_per_week = 10 * 60 # Default guess
 
-                        if total_remaining_minutes > 0:
-                            estimated_weeks = round(total_remaining_minutes / avg_mins_per_week)
-                            timeline_estimate = f"~ {estimated_weeks} weeks remaining (estimated)"
-                        else:
-                             timeline_estimate = "Remaining steps have no time estimate."
-                    else: # No remaining step IDs means all are complete
-                        timeline_estimate = "Congratulations! All steps complete."
-                elif not current_path_step_ids:
-                     timeline_estimate = "No steps defined for this path."
-                else: # avg_mins_per_week is 0
-                    timeline_estimate = "Set weekly time commitment for estimate."
+                    if avg_mins_per_week > 0:
+                        remaining_step_ids = current_path_step_ids - completed_step_ids
+                        if remaining_step_ids:
+                            remaining_steps_data = Step.query.filter(
+                                Step.id.in_(remaining_step_ids)
+                            ).with_entities(Step.estimated_time_minutes).all()
+                            total_remaining_minutes = sum(time or 0 for time, in remaining_steps_data)
 
-            except Exception as e:
-                print(f"Error calculating timeline: {e}")
-                timeline_estimate = "Could not calculate timeline."
-        else: # No time commitment set
-            timeline_estimate = "Set weekly time commitment for estimate."
+                            if total_remaining_minutes > 0:
+                                estimated_weeks = round(total_remaining_minutes / avg_mins_per_week)
+                                timeline_estimate = f"~ {estimated_weeks} weeks remaining (estimated)"
+                            else:
+                                timeline_estimate = "Remaining steps have no time estimate."
+                        else: # All steps in path are completed
+                             timeline_estimate = "Congratulations! All steps complete."
+                    else: # avg_mins_per_week is 0
+                        timeline_estimate = "Set weekly time commitment for estimate."
+                except Exception as e:
+                    print(f"Error calculating timeline: {e}")
+                    timeline_estimate = "Could not calculate timeline."
+            else: # No time commitment set
+                timeline_estimate = "Set weekly time commitment for estimate."
+        else: # Path has no steps
+             timeline_estimate = "No steps defined for this path."
 
 
     # --- Render the dashboard template ---
-    return render_template('dashboard.html', # Use the REAL dashboard template now
+    return render_template('dashboard.html',
                            user=current_user,
                            path=target_path,
                            milestones=milestones,
                            timeline_estimate=timeline_estimate,
-                           completed_step_ids=completed_step_ids) # Pass the set of IDs
+                           completed_step_ids=completed_step_ids,
+                           milestone_progress=milestone_progress,
+                           total_steps_in_path=total_steps_in_path,
+                           total_completed_steps=total_completed_steps,
+                           overall_percent_complete=overall_percent_complete)
 
 
 
