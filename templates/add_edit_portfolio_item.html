@@ -1,64 +1,81 @@
 {% extends "base.html" %}
 
-{% block title %}My Portfolio - Careerpath!{% endblock %}
+{% block title %}{{ 'Edit' if is_edit else 'Add' }} Portfolio Item - Careerpath!{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-  <h1 class="h2">My Portfolio</h1>
-  <div class="btn-toolbar mb-2 mb-md-0">
-    <a href="{{ url_for('add_portfolio_item') }}" class="btn btn-sm btn-outline-primary">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-circle me-1" viewBox="0 0 16 16">
-        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-        <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
-      </svg>
-      Add New Item
-    </a>
-  </div>
-</div>
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-7">
+    <h2>{{ 'Edit' if is_edit else 'Add New' }} Portfolio Item</h2>
+    <p class="text-muted">Showcase your projects, certificates, and accomplishments.</p>
 
-{% if portfolio_items %}
-<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-  {% for item in portfolio_items %}
-  <div class="col">
-    <div class="card h-100">
-      {# <img src="..." class="card-img-top" alt="..."> #} {# Optional Image later #}
-      <div class="card-body">
-        <h5 class="card-title">{{ item.title }}</h5>
-        <h6 class="card-subtitle mb-2 text-muted">{{ item.item_type }}</h6>
-        {% if item.description %}
-        <p class="card-text">{{ item.description|truncate(150) }}</p> {# Truncate long descriptions #}
+    {# IMPORTANT: Add enctype for file uploads #}
+    <form method="POST" action="" enctype="multipart/form-data" novalidate>
+      {{ form.hidden_tag() }} <div class="mb-3">
+        {{ form.title.label(class="form-label") }}
+        {{ form.title(class="form-control" + (" is-invalid" if form.title.errors else ""), **{'aria-describedby': 'titleHelp'}) }}
+        {% if form.title.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.title.errors %}{{ error }}{% endfor %}
+          </div>
         {% endif %}
-        {% if item.link_url %}
-          <a href="{{ item.link_url }}" class="btn btn-sm btn-outline-info me-2" target="_blank" rel="noopener noreferrer">View Link</a>
-        {% endif %}
-        {% if item.file_filename %}
-          <span class="badge bg-secondary me-2">File: {{ item.file_filename }}</span>
-          {# TODO: Add download link later #}
+        <div id="titleHelp" class="form-text">Give your item a clear title (e.g., "Customer Churn Analysis Project", "Google Data Analytics Certificate").</div>
+      </div>
+
+      <div class="mb-3">
+        {{ form.item_type.label(class="form-label") }}
+        {{ form.item_type(class="form-select" + (" is-invalid" if form.item_type.errors else "")) }}
+        {% if form.item_type.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.item_type.errors %}{{ error }}{% endfor %}
+          </div>
         {% endif %}
       </div>
-      <div class="card-footer text-muted d-flex justify-content-between align-items-center">
-        <small>Added: {{ item.created_at.strftime('%Y-%m-%d') }}</small>
-        <div>
-          <a href="{{ url_for('edit_portfolio_item', item_id=item.id) }}" class="btn btn-sm btn-outline-secondary me-1 py-0 px-1" title="Edit">
-            <small>Edit</small>
-          </a>
-          {# Delete Button uses POST form #}
-          <form method="POST" action="{{ url_for('delete_portfolio_item', item_id=item.id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this item?');">
-             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-             <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">
-               <small>Delete</small>
-             </button>
-           </form>
-        </div>
-      </div>
-    </div>
-  </div>
-  {% endfor %}
-</div>
-{% else %}
-<div class="alert alert-info" role="alert">
-  Your portfolio is empty. Click "Add New Item" to get started!
-</div>
-{% endif %}
 
+      <div class="mb-3">
+        {{ form.description.label(class="form-label") }}
+        {{ form.description(class="form-control" + (" is-invalid" if form.description.errors else ""), rows="4", **{'aria-describedby': 'descHelp'}) }}
+         {% if form.description.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.description.errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+        <div id="descHelp" class="form-text">Briefly describe the item. What skills did you use? What was the outcome? (Optional)</div>
+      </div>
+
+      <hr>
+      <p class="text-muted">Provide either a link OR upload a file for your item:</p>
+
+      <div class="mb-3">
+        {{ form.link_url.label(class="form-label") }}
+        {{ form.link_url(class="form-control" + (" is-invalid" if form.link_url.errors else ""), placeholder="https://github.com/your-repo") }}
+        {% if form.link_url.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.link_url.errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+       <div class="mb-3">
+        {{ form.item_file.label(class="form-label") }}
+        {% if is_edit and item and item.file_filename %}
+          <div class="alert alert-info alert-sm py-1 px-2">
+             Current file: {{ item.file_filename }} (Uploading a new file will replace this)
+          </div>
+        {% endif %}
+        {{ form.item_file(class="form-control" + (" is-invalid" if form.item_file.errors else "")) }}
+         {% if form.item_file.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.item_file.errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+
+      <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+         <a href="{{ url_for('portfolio') }}" class="btn btn-outline-secondary me-md-2">Cancel</a>
+         {{ form.submit(class="btn btn-primary") }}
+      </div>
+    </form>
+  </div>
+</div>
 {% endblock %}
