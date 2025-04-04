@@ -39,23 +39,34 @@
                           <small class="text-muted">Est. Time: {{ (step.estimated_time_minutes / 60)|round(1) if step.estimated_time_minutes >= 60 else step.estimated_time_minutes }} {{ 'hours' if step.estimated_time_minutes >= 60 else 'minutes' }}</small><br>
                         {% endif %}
                         {# Resources for the step #}
-                        {% if step.resources %}
-                            <small>Resources:</small>
-                            <ul>
-                                {% for resource in step.resources %}
-                                    <li>
-                                        <a href="{{ resource.url }}" target="_blank" rel="noopener noreferrer">
-                                            {{ resource.name }}
-                                            {% if resource.resource_type %}({{ resource.resource_type }}){% endif %}
-                                        </a>
-                                    </li>
-                                {% endfor %}
-                            </ul>
+                        {% if step.resources.count() > 0 %} {# Use count() for dynamic query #}
+                          <small>Resources:</small>
+                          <ul>
+                            {% for resource in step.resources %}
+                              <li>
+                                <a href="{{ resource.url }}" target="_blank" rel="noopener noreferrer">
+                                  {{ resource.name }}
+                                  {% if resource.resource_type %}({{ resource.resource_type }}){% endif %}
+                                </a>
+                              </li>
+                            {% endfor %}
+                          </ul>
                         {% endif %}
                       </div>
-                      {# Placeholder/Area for completion status/button #}
-                      <span class="badge bg-light text-dark">
-                        {# Action Button - Added in Part 2 #}
+                      {# Area for completion status/button #}
+                      <span class="badge bg-light text-dark ms-2"> {# Added margin start #}
+                        {# Completion Status Logic (currently commented out - for next step) #}
+                        {# {% if step.id in completed_step_ids %} #}
+                        {#     <span class="badge bg-success">Completed</span> #}
+                        {# {% else %} #}
+                          <form method="POST" action="{{ url_for('toggle_step_status', step_id=step.id) }}" class="d-inline">
+                            {# CSRF token usually handled globally by Flask-WTF if configured #}
+                            {# <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/> #}
+                            <button type="submit" class="btn btn-sm btn-outline-success py-0" title="Mark as complete">
+                               <small>Done?</small>
+                            </button>
+                          </form>
+                        {# {% endif %} #}
                       </span>
                     </li>
                   {% else %}
@@ -67,13 +78,13 @@
           </div>
         {% endfor %}
       {% else %}
-          <p>No milestones defined for this career path yet.</p>
+        <p>No milestones defined for this career path yet.</p>
       {% endif %}
     </div> {# End accordion #}
 
   {% else %}
-      <p>You haven't selected a target career path yet. Please complete your profile.</p>
-      <a href="{{ url_for('onboarding') }}" class="btn btn-primary">Complete Profile</a>
+    <p>You haven't selected a target career path yet. Please complete your profile.</p>
+    <a href="{{ url_for('onboarding') }}" class="btn btn-primary">Complete Profile</a>
   {% endif %}
 
 {% endblock %}
