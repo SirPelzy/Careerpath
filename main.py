@@ -8,12 +8,9 @@ from flask_wtf.csrf import CSRFProtect
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
 from dotenv import load_dotenv
-
-# Import Models (Ensure all required models are listed)
-from models import db, User, CareerPath, Milestone, Step, Resource, UserStepStatus # <-- Added UserStepStatus
-
-# Import Forms
-from forms import RegistrationForm, LoginForm, OnboardingForm
+from flask import abort # For permission errors
+from models import db, User, CareerPath, Milestone, Step, Resource, UserStepStatus, PortfolioItem
+from forms import RegistrationForm, LoginForm, OnboardingForm, PortfolioItemForm
 
 
 # Load environment variables from .env file
@@ -312,6 +309,180 @@ def toggle_step_status(step_id):
 
     # Redirect back to the dashboard where the path is displayed
     return redirect(url_for('dashboard'))
+
+
+# --- Portfolio Routes ---
+
+# Utility function to get portfolio upload path
+def get_portfolio_upload_path(filename):
+    portfolio_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'portfolio')
+    # Ensure portfolio subdirectory exists
+    os.makedirs(portfolio_dir, exist_ok=True)
+    return os.path.join(portfolio_dir, filename)
+
+@app.route('/portfolio')
+@login_required
+def portfolio():
+    """Displays the user's portfolio items."""
+    items = PortfolioItem.query.filter_by(user_id=current_user.id).order_by(PortfolioItem.created_at.desc()).all()
+    return render_template('portfolio.html', title='My Portfolio', portfolio_items=items)
+
+@app.route('/portfolio/add', methods=['GET', 'POST'])
+@login_required
+def add_portfolio_item():
+    """Handles adding a new portfolio item."""
+    form = PortfolioItemForm()
+    if form.validate_on_submit():
+        link_url = form.link_url.data
+        file_filename_to_save = None # Filename to store in DB
+
+        # Handle file upload
+        if form.item_file.data:
+            file = form.item_file.data
+            base_filename = secure_filename(file.filename)
+            unique_id = uuid.uuid4().hex
+            name, ext = os.path.splitext(base_filename)
+            ext = ext.lower()
+            name = name[:100] # Limit base name length
+            file_filename_to_save = f"user_{current_user.id}_portfolio_{unique_id}{ext}"
+            try:
+                file_path = get_portfolio_upload_path(file_filename_to_save)
+                file.save(file_path)
+                print(f"Portfolio file saved to: {file_path}")
+            except Exception as e:
+                print(f"Error saving portfolio file: {e}")
+                flash('Error uploading file. Please try again.', 'danger')
+                # Decide if we should proceed without the file or return
+                file_filename_to_save = None # Don't save filename if save failed
+                # Optionally return here: return render_template(...)
+
+        # Create new PortfolioItem object
+        new_item = PortfolioItem(
+            user_id=current_user.id,
+            title=form.title.data,
+            description=form.description.data,
+            item_type=form.item_type.data,
+            link_url=link_url if link_url else None, # Store None if empty
+            file_filename=file_filename_to_save # Store the unique filename or None
+            # Add associated_step_id / milestone_id later if needed
+        )
+        try:
+            db.session.add(new_item)
+            db.session.commit()
+            flash('Portfolio item added successfully!', 'success')
+            return redirect(url_for('portfolio'))
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error adding portfolio item to DB: {e}")
+            flash('Error saving portfolio item. Please try again.', 'danger')
+
+    # Render the form template (used for both add and edit)
+    return render_template('add_edit_portfolio_item.html', title='Add Portfolio Item', form=form, is_edit=False)
+
+
+@app.route('/portfolio/<int:item_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_portfolio_item(item_id):
+    """Handles editing an existing portfolio item."""
+    item = PortfolioItem.query.get_or_404(item_id)
+    # Check ownership
+    if item.user_id != current_user.id:
+        abort(403) # Forbidden
+
+    form = PortfolioItemForm(obj=item) # Pre-populate form with item data on GET
+
+    if form.validate_on_submit():
+        file_filename_to_save = item.file_filename # Keep existing file by default
+        old_filename_to_delete = None
+
+        # Handle optional file upload (replaces existing if new file provided)
+        if form.item_file.data:
+            # Store old filename before assigning new one
+            if item.file_filename:
+                old_filename_to_delete = item.file_filename
+
+            file = form.item_file.data
+            base_filename = secure_filename(file.filename)
+            unique_id = uuid.uuid4().hex
+            name, ext = os.path.splitext(base_filename)
+            ext = ext.lower()
+            name = name[:100]
+            file_filename_to_save = f"user_{current_user.id}_portfolio_{unique_id}{ext}"
+            try:
+                file_path = get_portfolio_upload_path(file_filename_to_save)
+                file.save(file_path)
+                print(f"Updated portfolio file saved to: {file_path}")
+            except Exception as e:
+                print(f"Error saving updated portfolio file: {e}")
+                flash('Error uploading new file. Please try again.', 'danger')
+                file_filename_to_save = item.file_filename # Revert to old filename if save fails
+                old_filename_to_delete = None # Don't delete old file if new one failed
+
+        # Update item fields
+        item.title = form.title.data
+        item.description = form.description.data
+        item.item_type = form.item_type.data
+        item.link_url = form.link_url.data if form.link_url.data else None
+        item.file_filename = file_filename_to_save
+
+        try:
+            db.session.commit()
+            flash('Portfolio item updated successfully!', 'success')
+
+            # Delete old file AFTER commit is successful
+            if old_filename_to_delete:
+                try:
+                    old_file_path = get_portfolio_upload_path(old_filename_to_delete)
+                    if os.path.exists(old_file_path):
+                         os.remove(old_file_path)
+                         print(f"Deleted old portfolio file: {old_file_path}")
+                except OSError as e:
+                     print(f"Error deleting old portfolio file {old_file_path}: {e}")
+                     # Optionally flash a warning message about failure to delete old file
+
+            return redirect(url_for('portfolio'))
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error updating portfolio item {item_id}: {e}")
+            flash('Error updating portfolio item. Please try again.', 'danger')
+
+    # Pass item only needed to display current file info if editing
+    return render_template('add_edit_portfolio_item.html', title='Edit Portfolio Item', form=form, is_edit=True, item=item)
+
+
+@app.route('/portfolio/<int:item_id>/delete', methods=['POST']) # Use POST for deletion
+@login_required
+def delete_portfolio_item(item_id):
+    """Handles deleting a portfolio item."""
+    item = PortfolioItem.query.get_or_404(item_id)
+    # Check ownership
+    if item.user_id != current_user.id:
+        abort(403) # Forbidden
+
+    filename_to_delete = item.file_filename # Get filename before deleting DB record
+
+    try:
+        db.session.delete(item)
+        db.session.commit()
+
+        # Delete associated file AFTER successful DB deletion
+        if filename_to_delete:
+            try:
+                file_path = get_portfolio_upload_path(filename_to_delete)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    print(f"Deleted portfolio file: {file_path}")
+            except OSError as e:
+                print(f"Error deleting portfolio file {file_path}: {e}")
+                # Optionally flash a warning message
+
+        flash('Portfolio item deleted successfully.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error deleting portfolio item {item_id}: {e}")
+        flash('Error deleting portfolio item. Please try again.', 'danger')
+
+    return redirect(url_for('portfolio'))
 
 # --- Main execution ---
 if __name__ == '__main__':
