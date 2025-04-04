@@ -239,6 +239,49 @@ def onboarding():
 
     return render_template('onboarding.html', title='Complete Your Profile', form=form)
 
+# --- Route to Toggle Step Completion Status ---
+@app.route('/path/step/<int:step_id>/toggle', methods=['POST'])
+@login_required
+def toggle_step_status(step_id):
+    """Marks a step as complete or incomplete for the current user."""
+    step = Step.query.get_or_404(step_id)
+    # Optional: Check if step belongs to user's path? Maybe not needed if URL isn't guessable easily.
+
+    # Find existing status or create a new one
+    user_status = UserStepStatus.query.filter_by(user_id=current_user.id, step_id=step.id).first()
+
+    try:
+        if user_status:
+            # Toggle status
+            if user_status.status == 'completed':
+                user_status.status = 'not_started'
+                user_status.completed_at = None
+                flash(f'Step "{step.name}" marked as not started.', 'info')
+            else:
+                user_status.status = 'completed'
+                user_status.completed_at = datetime.datetime.utcnow()
+                flash(f'Step "{step.name}" marked as completed!', 'success')
+        else:
+            # Create new status record as completed
+            user_status = UserStepStatus(
+                user_id=current_user.id,
+                step_id=step.id,
+                status='completed',
+                completed_at=datetime.datetime.utcnow()
+            )
+            db.session.add(user_status)
+            flash(f'Step "{step.name}" marked as completed!', 'success')
+
+        db.session.commit()
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating step status for user {current_user.id}, step {step_id}: {e}")
+        flash('An error occurred while updating step status.', 'danger')
+
+    # Redirect back to the dashboard where the path is displayed
+    return redirect(url_for('dashboard'))
+
 # --- Main execution ---
 if __name__ == '__main__':
     # Ensure the upload folder exists
