@@ -3,13 +3,41 @@
 {% block title %}Your Dashboard - Careerpath!{% endblock %}
 
 {% block content %}
+  {# --- Welcome Header --- #}
   <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Welcome, {{ current_user.first_name }}!</h1>
-    </div>
+    {# Optional: Add profile/settings buttons #}
+  </div>
 
+  {# --- Check if a Path is Selected --- #}
   {% if path %}
-    <h2 class="h4">{{ path.name }} Journey</h2>
-    <p class="text-muted">{{ timeline_estimate }}</p> {# Display the estimated timeline #}
+
+    {# --- Summary Dashboard Section --- #}
+    <div class="row mb-4">
+      <div class="col-md-12">
+        <h4>Overall Journey Progress</h4>
+      </div>
+      <div class="col-md-8 mb-3 mb-md-0">
+        <div class="progress" style="height: 25px;" title="{{ overall_percent_complete }}% Complete">
+          <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: {{ overall_percent_complete }}%;" aria-valuenow="{{ overall_percent_complete }}" aria-valuemin="0" aria-valuemax="100">{{ overall_percent_complete }}%</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card text-center h-100">
+          <div class="card-body py-2">
+              <p class="card-text mb-0">
+                  <strong class="fs-5">{{ total_completed_steps }}</strong> / {{ total_steps_in_path }} Steps Completed
+              </p>
+              <small class="text-muted d-block">{{ timeline_estimate }}</small>
+          </div>
+        </div>
+      </div>
+    </div>
+    <hr>
+    {# --- End Summary Dashboard Section --- #}
+
+    {# --- Path Milestones Section --- #}
+    <h2 class="h4">{{ path.name }} Journey Milestones</h2>
 
     <div class="accordion" id="milestonesAccordion">
       {% if milestones %}
@@ -17,78 +45,88 @@
           <div class="accordion-item">
             <h2 class="accordion-header" id="heading{{ milestone.id }}">
               <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ milestone.id }}" aria-expanded="false" aria-controls="collapse{{ milestone.id }}">
-                Milestone {{ loop.index }}: {{ milestone.name }}
-                {# TODO: Add visual progress indicator for milestone later #}
+                <div class="w-100 d-flex justify-content-between align-items-center pe-3">
+                  <span>Milestone {{ loop.index }}: {{ milestone.name }}</span>
+                  {# Milestone Progress Text #}
+                  {% set progress = milestone_progress.get(milestone.id) %}
+                  {% if progress and progress.total > 0 %}
+                    <span class="badge bg-light text-dark ms-2">
+                      {{ progress.completed }} / {{ progress.total }} Done ({{ progress.percent }}%)
+                    </span>
+                  {% endif %}
+                </div>
               </button>
             </h2>
             <div id="collapse{{ milestone.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ milestone.id }}" data-bs-parent="#milestonesAccordion">
               <div class="accordion-body">
+                {# Milestone Progress Bar #}
+                {% set progress = milestone_progress.get(milestone.id) %}
+                {% if progress and progress.total > 0 %}
+                  <div class="progress mb-3" style="height: 8px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ progress.percent }}%;" aria-valuenow="{{ progress.percent }}" aria-valuemin="0" aria-valuemax="100"></div>
+                  </div>
+                {% endif %}
+
                 {% if milestone.description %}
                   <p>{{ milestone.description }}</p>
                 {% endif %}
 
+                {# Steps List #}
                 <ul class="list-group">
                   {% for step in milestone.steps %} {# Access steps via relationship #}
                     <li class="list-group-item d-flex justify-content-between align-items-start">
+                      {# Step Details #}
                       <div class="ms-2 me-auto">
                         <div class="fw-bold">{{ step.sequence }}. {{ step.name }}</div>
-                        {% if step.description %}
-                          <small>{{ step.description }}</small><br>
-                        {% endif %}
+                        {% if step.description %}<small>{{ step.description }}</small><br>{% endif %}
                         {% if step.estimated_time_minutes %}
                           <small class="text-muted">Est. Time: {{ (step.estimated_time_minutes / 60)|round(1) if step.estimated_time_minutes >= 60 else step.estimated_time_minutes }} {{ 'hours' if step.estimated_time_minutes >= 60 else 'minutes' }}</small><br>
                         {% endif %}
-                        {# Resources for the step #}
-                        {% if step.resources.count() > 0 %} {# Use count() for dynamic query #}
+                        {% if step.resources.count() > 0 %}
                           <small>Resources:</small>
                           <ul>
                             {% for resource in step.resources %}
                               <li>
                                 <a href="{{ resource.url }}" target="_blank" rel="noopener noreferrer">
-                                  {{ resource.name }}
-                                  {% if resource.resource_type %}({{ resource.resource_type }}){% endif %}
+                                  {{ resource.name }} {% if resource.resource_type %}({{ resource.resource_type }}){% endif %}
                                 </a>
                               </li>
                             {% endfor %}
                           </ul>
                         {% endif %}
                       </div>
-                      {# Area for completion status/button #}
-                      <span class="badge bg-light text-dark ms-2 align-self-center"> {# Aligned item center vertically #}
-                        {# --- Conditional logic for status --- #}
+                      {# Step Completion Status/Button #}
+                      <span class="badge bg-light text-dark ms-2 align-self-center">
                         {% if step.id in completed_step_ids %}
-                          {# Display if step is completed #}
                           <span class="text-success fw-bold">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-circle-fill me-1" viewBox="0 0 16 16" style="vertical-align: -0.125em;"> {# Adjusted alignment #}
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-circle-fill me-1" viewBox="0 0 16 16" style="vertical-align: -0.125em;">
                                 <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
                               </svg>Completed
                           </span>
                         {% else %}
-                          {# Display button if step is NOT completed #}
                           <form method="POST" action="{{ url_for('toggle_step_status', step_id=step.id) }}" class="d-inline">
-                            {# CSRF token usually handled globally by Flask-WTF #}
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/> {# Ensure CSRF token is included #}
                             <button type="submit" class="btn btn-sm btn-outline-success py-0" title="Mark as complete">
                                <small>Done?</small>
                             </button>
                           </form>
                         {% endif %}
-                        {# --- End conditional logic --- #}
-                      </span>
-                    </li>
+                      </span> {# End badge #}
+                    </li> {# End list item #}
                   {% else %}
                     <li class="list-group-item">No steps defined for this milestone yet.</li>
                   {% endfor %}
-                </ul>
-              </div>
-            </div>
-          </div>
+                </ul> {# End list group #}
+              </div> {# End accordion body #}
+            </div> {# End collapse #}
+          </div> {# End accordion item #}
         {% endfor %}
       {% else %}
         <p>No milestones defined for this career path yet.</p>
       {% endif %}
     </div> {# End accordion #}
 
+  {# --- If no path selected --- #}
   {% else %}
     <p>You haven't selected a target career path yet. Please complete your profile.</p>
     <a href="{{ url_for('onboarding') }}" class="btn btn-primary">Complete Profile</a>
