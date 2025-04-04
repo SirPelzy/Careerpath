@@ -159,3 +159,76 @@ class PortfolioItemForm(FlaskForm):
             self.link_url.errors.append('Please provide either a Link URL or upload a File.')
             return False
         return True
+
+
+# --- New Edit Profile Form ---
+class EditProfileForm(FlaskForm):
+    """Form for editing user profile information."""
+    # Email might be displayed but not editable, or requires specific validation if changeable
+    # email = StringField('Email', validators=[DataRequired(), Email()]) # Example if editable
+
+    first_name = StringField('First Name', validators=[DataRequired(), Length(max=50)])
+    last_name = StringField('Last Name', validators=[DataRequired(), Length(max=50)])
+
+    target_career_path = QuerySelectField(
+        'Select Your Target Career Path',
+        query_factory=career_path_query,
+        get_label='name',
+        get_pk=get_pk_from_identity,
+        allow_blank=False, # Keep required for now, could change
+        validators=[DataRequired(message="Please select your target career path.")]
+    )
+    current_role = StringField(
+        'Your Current Role/Job Title (or "Student")',
+        validators=[DataRequired(), Length(max=100)]
+    )
+    employment_status = SelectField(
+        'Current Employment Status',
+        choices=[ # Keep choices consistent with OnboardingForm
+            ('', '-- Select Status --'),
+            ('Student', 'Student'),
+            ('Employed Full-Time', 'Employed Full-Time'),
+            ('Employed Part-Time', 'Employed Part-Time'),
+            ('Unemployed', 'Unemployed'),
+            ('Freelance/Self-employed', 'Freelance/Self-employed'),
+            ('Other', 'Other')
+        ],
+        validators=[DataRequired(message="Please select your employment status.")]
+    )
+    time_commitment = SelectField(
+        'Estimated Weekly Time Commitment for Learning',
+        choices=[ # Keep choices consistent with OnboardingForm
+            ('', '-- Select Time --'),
+            ('<5 hrs', '< 5 hours'),
+            ('5-10 hrs', '5 - 10 hours'),
+            ('10-15 hrs', '10 - 15 hours'),
+            ('15+ hrs', '15+ hours')
+        ],
+        validators=[DataRequired(message="Please estimate your available time.")]
+    )
+    interests = TextAreaField(
+        'Specific Tech Interests (Optional)',
+        validators=[Optional(), Length(max=500)]
+    )
+    learning_style = SelectField(
+        'Preferred Learning Style (Optional)',
+        choices=[ # Keep choices consistent with OnboardingForm
+            ('', '-- Select Style (Optional) --'),
+            ('Visual', 'Visual (Diagrams, Videos)'),
+            ('Auditory', 'Auditory (Lectures, Discussions)'),
+            ('Reading/Writing', 'Reading/Writing (Articles, Notes)'),
+            ('Kinesthetic/Practical', 'Kinesthetic/Practical (Doing, Projects)')
+        ],
+        validators=[Optional()]
+    )
+    # Separate handling for CV viewing/upload might be better in the route/template
+    # We can add a field here if we want the upload as part of this specific form submission
+    cv_upload = FileField(
+        'Upload New CV/Resume (Optional - Replaces Existing)',
+        validators=[
+            Optional(),
+            FileAllowed(['pdf', 'docx'], 'Only PDF and DOCX files are allowed!')
+        ]
+    )
+    submit = SubmitField('Update Profile')
+
