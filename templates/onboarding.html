@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Complete Your Profile - Careerpath!{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <h2>Complete Your Profile</h2>
+    <p class="lead">Tell us a bit more about yourself so we can personalize your career path.</p>
+
+    <form method="POST" action="" enctype="multipart/form-data">
+      {{ form.hidden_tag() }} <div class="mb-3">
+        {{ form.target_career_path.label(class="form-label") }}
+        {{ form.target_career_path(class="form-select" + (" is-invalid" if form.target_career_path.errors else "")) }}
+        {% if form.target_career_path.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.target_career_path.errors %}
+              <span>{{ error }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        {{ form.current_role.label(class="form-label") }}
+        {{ form.current_role(class="form-control" + (" is-invalid" if form.current_role.errors else "")) }}
+        {% if form.current_role.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.current_role.errors %}
+              <span>{{ error }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        {{ form.employment_status.label(class="form-label") }}
+        {{ form.employment_status(class="form-select" + (" is-invalid" if form.employment_status.errors else "")) }}
+        {% if form.employment_status.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.employment_status.errors %}
+              <span>{{ error }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        {{ form.time_commitment.label(class="form-label") }}
+        {{ form.time_commitment(class="form-select" + (" is-invalid" if form.time_commitment.errors else "")) }}
+        {% if form.time_commitment.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.time_commitment.errors %}
+              <span>{{ error }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        {{ form.interests.label(class="form-label") }}
+        {{ form.interests(class="form-control" + (" is-invalid" if form.interests.errors else ""), rows="3") }}
+        {% if form.interests.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.interests.errors %}
+              <span>{{ error }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+       <div class="mb-3">
+        {{ form.learning_style.label(class="form-label") }}
+        {{ form.learning_style(class="form-select" + (" is-invalid" if form.learning_style.errors else "")) }}
+        {% if form.learning_style.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.learning_style.errors %}
+              <span>{{ error }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        {{ form.cv_upload.label(class="form-label") }}
+        {{ form.cv_upload(class="form-control" + (" is-invalid" if form.cv_upload.errors else "")) }}
+         {% if form.cv_upload.errors %}
+          <div class="invalid-feedback">
+            {% for error in form.cv_upload.errors %}
+              <span>{{ error }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+         {% if current_user.cv_filename %}
+            <small class="form-text text-muted">Current file: {{ current_user.cv_filename }} (Uploading a new file will replace this)</small>
+         {% endif %}
+      </div>
+
+
+      <div class="d-grid mb-3">
+        {{ form.submit(class="btn btn-primary btn-lg") }}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
