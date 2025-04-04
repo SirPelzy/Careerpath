@@ -1,5 +1,10 @@
 import os
 import uuid
+from werkzeug.utils import secure_filename # To sanitize filenames
+# Ensure User and CareerPath are imported from models
+from models import db, User, CareerPath
+# Ensure OnboardingForm is imported from forms
+from forms import OnboardingForm
 from flask import Flask, render_template, redirect, url_for, flash, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
@@ -128,22 +133,72 @@ def logout():
     flash('You have been logged out.', 'success')
     return redirect(url_for('home'))
 
-
-# --- Onboarding Route (Placeholder - will implement next) ---
+# --- Onboarding Route Implementation ---
 @app.route('/onboarding', methods=['GET', 'POST'])
 @login_required
 def onboarding():
+    # Redirect if user already completed onboarding
     if current_user.onboarding_complete:
          return redirect(url_for('dashboard'))
-    # form = OnboardingForm() # We will create and use this later
-    # if form.validate_on_submit():
-    #     # Update user profile fields
-    #     # current_user.onboarding_complete = True
-    #     # db.session.commit()
-    #     # flash('Profile updated!', 'success')
-    #     # return redirect(url_for('dashboard'))
-    # return render_template('onboarding.html', title='Complete Profile', form=form) # Template to be created
-    return f"Onboarding page for {current_user.first_name}. (Complete: {current_user.onboarding_complete})" # Placeholder
+
+    form = OnboardingForm()
+
+    if form.validate_on_submit():
+        try:
+            # Handle CV Upload
+            cv_filename_to_save = None
+            if form.cv_upload.data:
+                file = form.cv_upload.data
+                # Sanitize filename
+                base_filename = secure_filename(file.filename)
+                # Create unique filename (e.g., user_id_timestamp_original_name)
+                # Using UUID for simplicity here to ensure uniqueness
+                unique_id = uuid.uuid4().hex
+                # Split extension
+                name, ext = os.path.splitext(base_filename)
+                # Limit filename length if necessary before creating unique name
+                name = name[:100] # Limit base name length
+                cv_filename_to_save = f"user_{current_user.id}_{unique_id}{ext}"
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], cv_filename_to_save)
+
+                # TODO: Optional - Delete old CV file if it exists
+                # if current_user.cv_filename:
+                #    old_path = os.path.join(app.config['UPLOAD_FOLDER'], current_user.cv_filename)
+                #    if os.path.exists(old_path):
+                #        os.remove(old_path)
+
+                # Save the new file
+                file.save(file_path)
+                print(f"CV saved to: {file_path}") # Debugging line
+
+
+            # Update user object
+            current_user.target_career_path = form.target_career_path.data # Assign selected CareerPath object
+            current_user.current_role = form.current_role.data
+            current_user.employment_status = form.employment_status.data
+            current_user.time_commitment = form.time_commitment.data
+            current_user.interests = form.interests.data
+            current_user.learning_style = form.learning_style.data if form.learning_style.data else None # Handle empty selection
+            if cv_filename_to_save:
+                 current_user.cv_filename = cv_filename_to_save # Store only the filename
+
+            # Mark onboarding as complete
+            current_user.onboarding_complete = True
+
+            db.session.commit()
+            flash('Your profile has been updated successfully!', 'success')
+            return redirect(url_for('dashboard'))
+
+        except Exception as e:
+             db.session.rollback() # Rollback in case of error during update/save
+             print(f"Error during onboarding save: {e}") # Log the error
+             flash('An error occurred while saving your profile. Please try again.', 'danger')
+
+    # Pre-populate form if desired on GET request (optional)
+    # elif request.method == 'GET':
+    #    form.current_role.data = current_user.current_role # Example
+
+    return render_template('onboarding.html', title='Complete Your Profile', form=form)
 
 
 if __name__ == '__main__':
