@@ -105,10 +105,7 @@ def dashboard():
             print(f"Error calculating timeline: {e}")
             timeline_estimate = "Could not calculate timeline."
 
-
-    # For now, just show a basic message or render the actual dashboard template later
-    # return render_template('dashboard.html', user=current_user, path=target_path, milestones=milestones, timeline_estimate=timeline_estimate)
-    return render_template('dashboard_placeholder.html', # Create this temporary template
+    return render_template('dashboard.html', # Use the new template file
                            user=current_user,
                            path=target_path,
                            milestones=milestones,
