@@ -145,6 +145,55 @@ def onboarding():
     # return render_template('onboarding.html', title='Complete Profile', form=form) # Template to be created
     return f"Onboarding page for {current_user.first_name}. (Complete: {current_user.onboarding_complete})" # Placeholder
 
+# --- <<< PLACE THE TEMPORARY INIT ROUTE HERE >>> ---
+# Generate a unique key once and put it here or better, in your .env file
+# Example: python -c "import uuid; print(uuid.uuid4())"
+INIT_DB_SECRET_KEY = os.environ.get('INIT_DB_SECRET_KEY', 'replace-this-with-a-very-secret-key-3579') # Use a real secret
+
+@app.route(f'/admin/init-db/{INIT_DB_SECRET_KEY}') # Use the secret path
+def init_database():
+    """Temporary route to initialize the database."""
+    # IMPORTANT: Check if the key matches if you put it in .env
+    # Example check (if you put the key in .env and want extra safety):
+    # route_key = request.view_args.get('secret_key_from_route') # Need to name it in route decorator
+    # if not route_key or route_key != os.environ.get('INIT_DB_SECRET_KEY'):
+    #     return "Unauthorized", 403 # Or abort(404) to hide endpoint
+
+    print("Attempting to initialize database...")
+    try:
+        # Use app context to ensure db operations work correctly
+        with app.app_context():
+            db.create_all()
+            print("Database tables created (or already exist).")
+
+            # Optional: Pre-populate Career Paths (Check if they exist first)
+            if not CareerPath.query.first():
+                print("Populating initial Career Paths...")
+                paths = [
+                    CareerPath(name="Data Analysis / Analytics", description="Focuses on interpreting data, finding insights, and visualization."),
+                    CareerPath(name="UX/UI Design", description="Focuses on user experience and interface design for digital products."),
+                    CareerPath(name="Cybersecurity", description="Focuses on protecting computer systems and networks from threats."),
+                    CareerPath(name="Software Engineering", description="Focuses on designing, developing, and maintaining software systems.")
+                ]
+                db.session.add_all(paths)
+                db.session.commit()
+                print("Career Paths added.")
+            else:
+                 print("Career Paths already exist.")
+
+        flash("Database initialization attempted successfully!", 'success')
+        # Maybe redirect somewhere safe afterwards, or just show a message
+        return redirect(url_for('home')) # Redirect home after success
+        # return "Database initialization attempted successfully!", 200
+    except Exception as e:
+        print(f"Error during DB initialization: {e}")
+        flash(f"Error during DB initialization: {e}", 'danger')
+        # return f"Error during DB initialization: {e}", 500
+        return redirect(url_for('home')) # Redirect home even on error
+
+# !!! REMEMBER TO REMOVE THIS ROUTE AFTER USE AND REDEPLOY !!!
+# --- End of Temporary Init Route ---
+
 
 if __name__ == '__main__':
     # Ensure the upload folder exists
