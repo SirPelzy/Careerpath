@@ -27,6 +27,17 @@
               <li class="nav-item">
                 <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
               </li>
+              <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+              </li>
+              {# --- Add this Portfolio Link --- #}
+              <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('portfolio') }}">Portfolio</a>
+              </li>
+              {# --- End Portfolio Link --- #}
+              <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+              </li>
             {% else %}
               <li class="nav-item">
                 <a class="nav-link" href="{{ url_for('login') }}">Login</a>
