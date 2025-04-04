@@ -52,7 +52,7 @@ def load_user(user_id):
 # --- Routes ---
 @app.route('/')
 def home():
-    return render_template('home.html')
+    return render_template('home.html', is_homepage=True)
 
 # --- Combined Dashboard Route ---
 @app.route('/dashboard')
@@ -61,6 +61,7 @@ def dashboard():
     if not current_user.onboarding_complete:
         flash('Please complete your profile information to get started.', 'info')
         return redirect(url_for('onboarding'))
+        
 
     target_path = current_user.target_career_path
     milestones = []
@@ -166,6 +167,7 @@ def dashboard():
                            total_steps_in_path=total_steps_in_path,
                            total_completed_steps=total_completed_steps,
                            overall_percent_complete=overall_percent_complete)
+                           is_homepage=False)
 
 
 
@@ -294,7 +296,7 @@ def onboarding():
              print(f"Error during onboarding save: {e}") # Log the specific error
              flash('An error occurred while saving your profile. Please try again.', 'danger')
 
-    return render_template('onboarding.html', title='Complete Your Profile', form=form)
+    return render_template('onboarding.html', title='Complete Your Profile', form=form, is_homepage=False)
 
 # --- Route to Toggle Step Completion Status ---
 @app.route('/path/step/<int:step_id>/toggle', methods=['POST'])
@@ -354,7 +356,7 @@ def get_portfolio_upload_path(filename):
 def portfolio():
     """Displays the user's portfolio items."""
     items = PortfolioItem.query.filter_by(user_id=current_user.id).order_by(PortfolioItem.created_at.desc()).all()
-    return render_template('portfolio.html', title='My Portfolio', portfolio_items=items)
+    return render_template('portfolio.html', title='My Portfolio', portfolio_items=items, is_homepage=False)
 
 @app.route('/portfolio/add', methods=['GET', 'POST'])
 @login_required
@@ -406,7 +408,7 @@ def add_portfolio_item():
             flash('Error saving portfolio item. Please try again.', 'danger')
 
     # Render the form template (used for both add and edit)
-    return render_template('add_edit_portfolio_item.html', title='Add Portfolio Item', form=form, is_edit=False)
+    return render_template('add_edit_portfolio_item.html', title='Add Portfolio Item', form=form, is_edit=False, is_homepage=False)
 
 
 @app.route('/portfolio/<int:item_id>/edit', methods=['GET', 'POST'])
@@ -476,7 +478,7 @@ def edit_portfolio_item(item_id):
             flash('Error updating portfolio item. Please try again.', 'danger')
 
     # Pass item only needed to display current file info if editing
-    return render_template('add_edit_portfolio_item.html', title='Edit Portfolio Item', form=form, is_edit=True, item=item)
+    return render_template('add_edit_portfolio_item.html', title='Edit Portfolio Item', form=form, is_edit=True, item=item, is_homepage=False)
 
 
 @app.route('/portfolio/<int:item_id>/delete', methods=['POST']) # Use POST for deletion
