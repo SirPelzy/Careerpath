@@ -7,10 +7,10 @@ from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
 from dotenv import load_dotenv
 import datetime
-# Import models and forms later when created
-# from models import db, User, CareerPath
-# from forms import RegistrationForm, LoginForm, OnboardingForm
-
+from flask import render_template, redirect, url_for, flash, request # Ensure all are imported
+from flask_login import login_user, logout_user, current_user, login_required # Ensure all are imported
+from models import db, User, CareerPath # Ensure db and User are imported
+from forms import RegistrationForm, LoginForm # Remove OnboardingForm for now, import the others
 
 
 # Load environment variables from .env file
@@ -56,50 +56,94 @@ def load_user(user_id):
 # --- Routes ---
 @app.route('/')
 def home():
-    """Serves the home page."""
-    return render_template('home.html') # We'll create this template later
+    return render_template('home.html')
 
+# --- Dashboard Route (ensure login_required and onboarding check) ---
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    """Serves the main user dashboard after login."""
-    # Check if onboarding is complete, redirect if not
     if not current_user.onboarding_complete:
         flash('Please complete your profile information to get started.', 'info')
         return redirect(url_for('onboarding'))
+    # --- Placeholder dashboard logic ---
+    user_path = None # Replace with actual path fetching later
+    # Make sure to create dashboard.html template later
+    # return render_template('dashboard.html', user=current_user, path=user_path)
+    return f"Welcome to your Dashboard, {current_user.first_name}! (Onboarding Complete: {current_user.onboarding_complete})" # Placeholder
 
-    # --- Placeholder for dashboard logic ---
-    # Fetch user's path, milestones, etc.
-    user_path = None # Example: Fetch UserPath associated with current_user
-    return render_template('dashboard.html', user=current_user, path=user_path) # Template to be created
-
-# --- Authentication Routes (Placeholder Stubs) ---
+# --- Authentication Routes ---
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    # Implementation will go here using RegistrationForm
-    return "Register Page Placeholder" # Placeholder
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard')) # Redirect if already logged in
+    form = RegistrationForm()
+    if form.validate_on_submit():
+        # Check again in route just in case (though form validator should catch it)
+        existing_user = User.query.filter_by(email=form.email.data.lower()).first()
+        if existing_user:
+             flash('That email is already registered. Please log in.', 'warning')
+             return redirect(url_for('login'))
+
+        user = User(
+            first_name=form.first_name.data,
+            last_name=form.last_name.data,
+            email=form.email.data.lower() # Store email in lowercase
+        )
+        user.set_password(form.password.data) # Hash password
+        db.session.add(user)
+        db.session.commit()
+        flash('Your account has been created! Please log in.', 'success')
+        return redirect(url_for('login'))
+    return render_template('register.html', title='Register', form=form)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # Implementation will go here using LoginForm
-    return "Login Page Placeholder" # Placeholder
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard')) # Redirect if already logged in
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data.lower()).first()
+        if user and user.check_password(form.password.data):
+            login_user(user, remember=form.remember_me.data)
+            user.last_login = datetime.datetime.utcnow() # Update last login time
+            db.session.commit()
+            next_page = request.args.get('next')
+            # Security: Validate next_page URL if provided
+            if next_page and not next_page.startswith('/'):
+                 next_page = None # Discard potentially malicious URL
+            flash('Login Successful!', 'success')
+            # Redirect logic: Onboarding or Dashboard
+            if not user.onboarding_complete:
+                 return redirect(url_for('onboarding'))
+            else:
+                 return redirect(next_page or url_for('dashboard')) # Redirect to next or dashboard
+        else:
+            flash('Login Unsuccessful. Please check email and password.', 'danger')
+    return render_template('login.html', title='Login', form=form)
 
 @app.route('/logout')
-@login_required
+@login_required # Ensure user must be logged in to log out
 def logout():
     logout_user()
     flash('You have been logged out.', 'success')
     return redirect(url_for('home'))
 
-# --- Onboarding Route (Placeholder Stub) ---
+
+# --- Onboarding Route (Placeholder - will implement next) ---
 @app.route('/onboarding', methods=['GET', 'POST'])
 @login_required
 def onboarding():
-    # Implementation will go here using OnboardingForm
-    # Redirect if already completed
     if current_user.onboarding_complete:
          return redirect(url_for('dashboard'))
-    return "Onboarding Page Placeholder" # Placeholder
+    # form = OnboardingForm() # We will create and use this later
+    # if form.validate_on_submit():
+    #     # Update user profile fields
+    #     # current_user.onboarding_complete = True
+    #     # db.session.commit()
+    #     # flash('Profile updated!', 'success')
+    #     # return redirect(url_for('dashboard'))
+    # return render_template('onboarding.html', title='Complete Profile', form=form) # Template to be created
+    return f"Onboarding page for {current_user.first_name}. (Complete: {current_user.onboarding_complete})" # Placeholder
 
 
 if __name__ == '__main__':
