@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Choose Your Path - Careerpath!{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="row justify-content-center text-center">
+    <div class="col-md-8">
+      <h1 class="h2 mb-4">Let's Get Started!</h1>
+      <p class="lead mb-5">How would you like to begin your tech journey?</p>
+    </div>
+  </div>
+  <div class="row justify-content-center g-4">
+    {# Card 1: Select Path Directly #}
+    <div class="col-md-5">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body d-flex flex-column justify-content-center align-items-center text-center p-4">
+           <i class="bi bi-pin-map-fill fs-1 text-primary mb-3"></i>
+           <h5 class="card-title">I Know My Path</h5>
+           <p class="card-text">Select your target career path directly and complete your profile.</p>
+           <a href="{{ url_for('onboarding_form') }}" class="btn btn-primary mt-auto">Select a Career Path</a>
+        </div>
+      </div>
+    </div>
+
+    {# Card 2: Get Recommendation #}
+    <div class="col-md-5">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body d-flex flex-column justify-content-center align-items-center text-center p-4">
+            <i class="bi bi-magic fs-1 text-success mb-3"></i>
+           <h5 class="card-title">Help Me Choose</h5>
+           <p class="card-text">Take a short quiz to get personalized career path recommendations.</p>
+           <a href="{{ url_for('recommendation_test') }}" class="btn btn-success mt-auto">Get Recommendation</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
