@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Careerpath!{% endblock %}
+
+{% block content %}
+  <div class="text-center mt-5">
+    <h1>{{ title }}</h1>
+    <p class="lead">This feature is under construction.</p>
+    {% if recommended_path %}
+        <p>(Dummy recommended path: {{ recommended_path.name }})</p>
+        <a href="{{ url_for('onboarding_form', recommended_path_id=recommended_path.id) }}" class="btn btn-primary">Accept & Continue Onboarding</a>
+        <a href="{{ url_for('onboarding_form') }}" class="btn btn-secondary">Choose Different Path</a>
+    {% else %}
+        <a href="{{ url_for('onboarding') }}" class="btn btn-secondary">Back to Onboarding Choice</a>
+    {% endif %}
+  </div>
+{% endblock %}
