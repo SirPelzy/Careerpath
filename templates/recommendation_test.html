@@ -3,19 +3,16 @@
 {% block title %}{{ title }} - Careerpath!{% endblock %}
 
 {% block content %}
+{# --- Add NEW Fixed Back Link Here --- #}
+<a href="{{ url_for('onboarding') }}" class="btn btn-sm btn-outline-secondary back-link-fixed" title="Back to Start Choice">
+  <i class="bi bi-arrow-left-circle me-1"></i>Back
+</a>
+{# --- End Fixed Back Link --- #}
 <div class="row justify-content-center">
   {# Increased width: md-10, lg-8 #}
   <div class="col-md-10 col-lg-8">
     <h2 class="text-center">{{ title }}</h2>
     <p class="lead text-center">Answer these questions to help us suggest a suitable starting path for you.</p>
-
-    {# --- Back Navigation Link --- #}
-    <div class="my-4 text-center"> {# Centered the back link #}
-      <a href="{{ url_for('onboarding') }}" class="text-decoration-none text-muted">
-        <i class="bi bi-arrow-left-circle me-1"></i>Back to Start Choice
-      </a>
-    </div>
-    {# --- End Back Navigation Link --- #}
 
     <form method="POST" action="" novalidate>
       {{ form.hidden_tag() }} {# --- Question 1 Block --- #}
