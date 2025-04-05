@@ -559,6 +559,12 @@ def profile():
                            form=form,
                            is_homepage=False) # Use sidebar navigation
 
+
+
+# --- <<< TEMPORARY ADMIN ROUTE FOR DB INIT & SEEDING >>> ---
+# !! IMPORTANT !! Remove or secure this route in production!
+INIT_DB_SECRET_KEY = os.environ.get('INIT_DB_SECRET_KEY', 'replace-this-with-a-very-secret-key-9876')
+
 @app.route(f'/admin/init-db/{INIT_DB_SECRET_KEY}')
 def init_database():
     """Temporary route to initialize the database and seed path data."""
