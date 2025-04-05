@@ -23,8 +23,6 @@ app = Flask(__name__)
 
 db.init_app(app)
 
-migrate = Migrate(app, db) # Initialize Flask-Migrate
-
 # --- Configuration ---
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secure-fallback-key-34567') # Use env var ideally
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
@@ -33,6 +31,8 @@ if not app.config['SQLALCHEMY_DATABASE_URI']:
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 # 10 MB limit for uploads
+
+migrate = Migrate(app, db) # Initialize Flask-Migrate
 
 # --- Initialize Extensions ---
 csrf = CSRFProtect(app)
