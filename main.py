@@ -438,11 +438,12 @@ def recommendation_results():
         flash('Recommendation results not found. Please try the test again.', 'warning')
         return redirect(url_for('recommendation_test'))
 
+    # Render the REAL results template now
     return render_template('recommendation_results.html',
                             title="Your Recommendation",
                             recommended_path_id=recommended_path_id,
                             recommended_path_name=recommended_path_name,
-                            is_homepage=False)
+                            is_homepage=False) # Use sidebar layout
 
 # --- Route to Toggle Step Completion Status ---
 @app.route('/path/step/<int:step_id>/toggle', methods=['POST'])
