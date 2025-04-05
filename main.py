@@ -12,8 +12,8 @@ from dotenv import load_dotenv
 # Import Models
 from models import db, User, CareerPath, Milestone, Step, Resource, UserStepStatus, PortfolioItem
 
-# Import Forms (Make sure EditProfileForm is imported)
-from forms import RegistrationForm, LoginForm, OnboardingForm, PortfolioItemForm, EditProfileForm
+# Import Forms (Make sure EditProfileForm and RecommendationTestForm are imported)
+from forms import RegistrationForm, LoginForm, OnboardingForm, PortfolioItemForm, EditProfileForm, RecommendationTestForm
 
 # Load environment variables from .env file
 load_dotenv()
@@ -72,7 +72,7 @@ def dashboard():
     total_completed_steps = 0
     overall_percent_complete = 0
     # Resource Personalization
-    recommended_resource_ids = set() # <-- Initialize set for recommendations
+    recommended_resource_ids = set()
 
     if target_path:
         # Fetch milestones ordered by sequence
@@ -127,7 +127,7 @@ def dashboard():
                 else:
                     milestone_progress[milestone.id] = {'completed': 0, 'total': 0, 'percent': 0}
 
-            # --- Timeline Estimation Logic (as before) ---
+            # --- Timeline Estimation Logic ---
             if current_user.time_commitment:
                 try:
                     commitment_str = current_user.time_commitment
@@ -162,7 +162,7 @@ def dashboard():
                 timeline_estimate = "Set weekly time commitment for estimate."
 
 
-            # --- << NEW >> Calculate Recommended Resource IDs ---
+            # --- Calculate Recommended Resource IDs ---
             user_style = current_user.learning_style
             user_interests_str = current_user.interests or ""
             # Basic keyword extraction
@@ -175,7 +175,7 @@ def dashboard():
             # Define mapping from style to resource types
             style_to_type_map = {
                 'Visual': ['Video', 'Project', 'Course', 'Guide', 'Platform'],
-                'Auditory': ['Video', 'Course'], # Limited options based on current types
+                'Auditory': ['Video', 'Course'],
                 'Reading/Writing': ['Article', 'Documentation', 'Guide', 'Tutorial', 'Resource'],
                 'Kinesthetic/Practical': ['Project', 'Practice', 'Course', 'Tool', 'Tutorial']
             }
@@ -183,15 +183,15 @@ def dashboard():
 
             # Iterate through all resources fetched for the path
             for _step_id, resource_id, resource_name, resource_type in path_steps_resources:
-                if resource_id is None: continue # Skip steps with no resources
+                if resource_id is None: continue
 
                 is_recommended = False
                 # 1. Check Learning Style Match
-                if resource_type and resource_type in preferred_types: # Check resource_type is not None
+                if resource_type and resource_type in preferred_types:
                     is_recommended = True
 
                 # 2. Check Interest Match (if not already recommended)
-                if not is_recommended and interest_keywords and resource_name: # Check resource_name is not None
+                if not is_recommended and interest_keywords and resource_name:
                     resource_name_lower = resource_name.lower()
                     if any(keyword in resource_name_lower for keyword in interest_keywords):
                         is_recommended = True
@@ -215,7 +215,7 @@ def dashboard():
                            total_steps_in_path=total_steps_in_path,
                            total_completed_steps=total_completed_steps,
                            overall_percent_complete=overall_percent_complete,
-                           recommended_resource_ids=recommended_resource_ids, # <-- Pass the new set
+                           recommended_resource_ids=recommended_resource_ids, # Pass the new set
                            is_homepage=False) # Pass flag for layout
 
 
@@ -245,8 +245,6 @@ def register():
             db.session.rollback()
             print(f"Error during registration: {e}")
             flash('An error occurred during registration. Please try again.', 'danger')
-    # Use is_homepage=True for consistency with login page style? Or define separate base?
-    # Let's assume login/register use the homepage style for now.
     return render_template('register.html', title='Register', form=form, is_homepage=True)
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -275,7 +273,6 @@ def login():
                  return redirect(next_page or url_for('dashboard'))
         else:
             flash('Login Unsuccessful. Please check email and password.', 'danger')
-    # Assume login uses homepage style
     return render_template('login.html', title='Login', form=form, is_homepage=True)
 
 @app.route('/logout')
@@ -286,27 +283,23 @@ def logout():
     return redirect(url_for('home'))
 
 # --- Onboarding Choice Route ---
-@app.route('/onboarding') # Removed methods=['GET', 'POST'] for now
+@app.route('/onboarding')
 @login_required
 def onboarding():
-    # Redirect if user already completed onboarding
     if current_user.onboarding_complete:
          return redirect(url_for('dashboard'))
-
-    # Show the initial choice page
-    return render_template('onboarding_choice.html', title='Choose Your Start', is_homepage=False) # Use sidebar layout
+    return render_template('onboarding_choice.html', title='Choose Your Start', is_homepage=False)
 
 # --- Onboarding Form Route (Handles actual form) ---
 @app.route('/onboarding/form', methods=['GET', 'POST'])
 @login_required
 def onboarding_form():
-    # Redirect if user already completed onboarding
     if current_user.onboarding_complete:
          return redirect(url_for('dashboard'))
 
+    # Ensure OnboardingForm is imported
     form = OnboardingForm()
 
-    # Pre-select path if recommended via query parameter (from recommendation results)
     if request.method == 'GET':
         recommended_path_id = request.args.get('recommended_path_id', type=int)
         if recommended_path_id:
@@ -315,17 +308,11 @@ def onboarding_form():
                 form.target_career_path.data = recommended_path
             else:
                 flash('Invalid recommendation ID provided.', 'warning')
-        # Pre-populate other fields if needed (though usually done after recommendation accepts)
-        # elif current_user.target_career_path: # Or pre-fill if they started before
-        #    form.target_career_path.data = current_user.target_career_path
-
 
     if form.validate_on_submit():
         try:
-            # --- Handle CV Upload ---
             cv_filename_to_save = current_user.cv_filename
             if form.cv_upload.data:
-                # ... (Keep existing CV upload logic: secure_filename, unique name, save, delete old) ...
                 file = form.cv_upload.data
                 base_filename = secure_filename(file.filename)
                 unique_id = uuid.uuid4().hex
@@ -342,7 +329,6 @@ def onboarding_form():
                 file.save(file_path)
                 print(f"CV saved to: {file_path}")
 
-            # --- Update User Object ---
             current_user.target_career_path = form.target_career_path.data
             current_user.current_role = form.current_role.data
             current_user.employment_status = form.employment_status.data
@@ -350,7 +336,7 @@ def onboarding_form():
             current_user.interests = form.interests.data
             current_user.learning_style = form.learning_style.data if form.learning_style.data else None
             current_user.cv_filename = cv_filename_to_save
-            current_user.onboarding_complete = True # Mark complete now
+            current_user.onboarding_complete = True
 
             db.session.commit()
             flash('Your profile is set up! Welcome to your dashboard.', 'success')
@@ -361,34 +347,102 @@ def onboarding_form():
              print(f"Error during onboarding form save: {e}")
              flash('An error occurred while saving your profile. Please try again.', 'danger')
 
-    # Render the actual form template (the renamed file)
     return render_template('onboarding_form.html',
                            title='Complete Your Profile',
                            form=form,
-                           is_homepage=False) # Use sidebar layout
+                           is_homepage=False)
 
-# --- Placeholder Recommendation Test Routes ---
+# --- Recommendation Test Route ---
 @app.route('/recommendation-test', methods=['GET', 'POST'])
 @login_required
 def recommendation_test():
-    # Logic for test form will go here
-    # For now, just show a placeholder
-    flash("Recommendation test coming soon!", "info")
-    return render_template('placeholder_page.html', title="Recommendation Test", is_homepage=False) # Create this template
+    """Displays and processes the career recommendation test."""
+    # Ensure RecommendationTestForm is imported
+    form = RecommendationTestForm()
+    if form.validate_on_submit():
+        # Basic Rule-Based Scoring
+        scores = {"Data Analysis / Analytics": 0, "UX/UI Design": 0, "Software Engineering": 0, "Cybersecurity": 0}
+        answers = {
+            'q1': form.q1_hobby.data,
+            'q2': form.q2_approach.data,
+            'q3': form.q3_reward.data,
+            'q4': form.q4_feedback.data
+        }
 
-@app.route('/recommendation-results') # Typically GET after test POST redirects here
+        # Q1 Scoring
+        if answers['q1'] == 'A': scores["Data Analysis / Analytics"] += 1
+        elif answers['q1'] == 'B': scores["UX/UI Design"] += 1
+        elif answers['q1'] == 'C': scores["Software Engineering"] += 1
+        elif answers['q1'] == 'D': scores["Cybersecurity"] += 1
+
+        # Q2 Scoring
+        if answers['q2'] == 'A': scores["Data Analysis / Analytics"] += 1
+        elif answers['q2'] == 'B': scores["UX/UI Design"] += 1
+        elif answers['q2'] == 'C': scores["Software Engineering"] += 1
+        elif answers['q2'] == 'D': scores["Cybersecurity"] += 1
+
+        # Q3 Scoring
+        if answers['q3'] == 'A': scores["Data Analysis / Analytics"] += 1
+        elif answers['q3'] == 'B': scores["UX/UI Design"] += 1
+        elif answers['q3'] == 'C': scores["Software Engineering"] += 1
+        elif answers['q3'] == 'D': scores["Cybersecurity"] += 1
+
+        # Q4 Scoring
+        if answers['q4'] == 'A': scores["Data Analysis / Analytics"] += 1
+        elif answers['q4'] == 'B': scores["UX/UI Design"] += 1
+        elif answers['q4'] == 'C': scores["Software Engineering"] += 1
+        elif answers['q4'] == 'D': scores["Cybersecurity"] += 1
+
+        # Determine highest score
+        available_paths = {"Data Analysis / Analytics", "UX/UI Design"} # Add more as seeded
+        filtered_scores = {path: score for path, score in scores.items() if path in available_paths and score > 0} # Only consider paths with score > 0
+
+        if not filtered_scores:
+             recommended_path_name = "Data Analysis / Analytics" # Default recommendation if no score > 0
+             flash("Your answers didn't strongly match our current paths, defaulting recommendation.", "info")
+        else:
+             recommended_path_name = max(filtered_scores, key=filtered_scores.get)
+             # Handle potential ties - simple approach: just takes the first max
+             max_score = filtered_scores[recommended_path_name]
+             tied_paths = [path for path, score in filtered_scores.items() if score == max_score]
+             # For now, we just use the first one found by max()
+
+        # Find the corresponding CareerPath object ID
+        recommended_path = CareerPath.query.filter_by(name=recommended_path_name).first()
+
+        if recommended_path:
+            # Redirect to results page, passing recommendation info
+            return redirect(url_for('recommendation_results',
+                                    recommended_path_id=recommended_path.id,
+                                    recommended_path_name=recommended_path.name))
+        else:
+            # Path not found in DB
+            flash('Could not process recommendation (path not found). Please select a path manually.', 'warning')
+            return redirect(url_for('onboarding_form'))
+
+    # Render the test form on GET or if validation fails
+    return render_template('recommendation_test.html',
+                           title="Career Recommendation Test",
+                           form=form,
+                           is_homepage=False)
+
+# --- Recommendation Results Route ---
+@app.route('/recommendation-results') # GET only
 @login_required
 def recommendation_results():
-    # Logic to display results and options will go here
-    # For now, just show a placeholder
-    # Example: Pass a dummy recommendation
-    recommended_path = CareerPath.query.first() # Just grabbing the first path as dummy data
-    flash("Recommendation results page coming soon!", "info")
-    return render_template('placeholder_page.html',
-                            title="Recommendation Results",
-                            recommended_path=recommended_path, # Dummy data
-                            is_homepage=False)
+    """Displays the recommendation results and next steps."""
+    recommended_path_id = request.args.get('recommended_path_id', type=int)
+    recommended_path_name = request.args.get('recommended_path_name')
 
+    if not recommended_path_id or not recommended_path_name:
+        flash('Recommendation results not found. Please try the test again.', 'warning')
+        return redirect(url_for('recommendation_test'))
+
+    return render_template('recommendation_results.html',
+                            title="Your Recommendation",
+                            recommended_path_id=recommended_path_id,
+                            recommended_path_name=recommended_path_name,
+                            is_homepage=False)
 
 # --- Route to Toggle Step Completion Status ---
 @app.route('/path/step/<int:step_id>/toggle', methods=['POST'])
@@ -397,7 +451,6 @@ def toggle_step_status(step_id):
     """Marks a step as complete or incomplete for the current user."""
     step = Step.query.get_or_404(step_id)
 
-    # Find existing status or create a new one
     user_status = UserStepStatus.query.filter_by(user_id=current_user.id, step_id=step.id).first()
 
     try:
@@ -437,7 +490,7 @@ def toggle_step_status(step_id):
 # Utility function to get portfolio upload path
 def get_portfolio_upload_path(filename):
     portfolio_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'portfolio')
-    os.makedirs(portfolio_dir, exist_ok=True) # Ensure portfolio subdirectory exists
+    os.makedirs(portfolio_dir, exist_ok=True)
     return os.path.join(portfolio_dir, filename)
 
 @app.route('/portfolio')
@@ -445,16 +498,17 @@ def get_portfolio_upload_path(filename):
 def portfolio():
     """Displays the user's portfolio items."""
     items = PortfolioItem.query.filter_by(user_id=current_user.id).order_by(PortfolioItem.created_at.desc()).all()
-    return render_template('portfolio.html', title='My Portfolio', portfolio_items=items, is_homepage=False) # Use sidebar
+    return render_template('portfolio.html', title='My Portfolio', portfolio_items=items, is_homepage=False)
 
 @app.route('/portfolio/add', methods=['GET', 'POST'])
 @login_required
 def add_portfolio_item():
     """Handles adding a new portfolio item."""
+    # Ensure PortfolioItemForm is imported
     form = PortfolioItemForm()
     if form.validate_on_submit():
         link_url = form.link_url.data
-        file_filename_to_save = None # Filename to store in DB
+        file_filename_to_save = None
 
         if form.item_file.data:
             file = form.item_file.data
@@ -491,7 +545,7 @@ def add_portfolio_item():
             print(f"Error adding portfolio item to DB: {e}")
             flash('Error saving portfolio item. Please try again.', 'danger')
 
-    return render_template('add_edit_portfolio_item.html', title='Add Portfolio Item', form=form, is_edit=False, is_homepage=False) # Use sidebar
+    return render_template('add_edit_portfolio_item.html', title='Add Portfolio Item', form=form, is_edit=False, is_homepage=False)
 
 
 @app.route('/portfolio/<int:item_id>/edit', methods=['GET', 'POST'])
@@ -502,17 +556,16 @@ def edit_portfolio_item(item_id):
     if item.user_id != current_user.id:
         abort(403)
 
-    form = PortfolioItemForm(obj=item) # Pre-populate form
+    form = PortfolioItemForm(obj=item)
 
     if form.validate_on_submit():
-        file_filename_to_save = item.file_filename # Keep existing file by default
+        file_filename_to_save = item.file_filename
         old_filename_to_delete = None
 
         if form.item_file.data:
-            if item.file_filename: # Mark old file for deletion
+            if item.file_filename:
                 old_filename_to_delete = item.file_filename
 
-            # Save new file
             file = form.item_file.data
             base_filename = secure_filename(file.filename)
             unique_id = uuid.uuid4().hex
@@ -527,10 +580,9 @@ def edit_portfolio_item(item_id):
             except Exception as e:
                 print(f"Error saving updated portfolio file: {e}")
                 flash('Error uploading new file. Please try again.', 'danger')
-                file_filename_to_save = item.file_filename # Revert to old name
-                old_filename_to_delete = None # Don't delete old file
+                file_filename_to_save = item.file_filename
+                old_filename_to_delete = None
 
-        # Update item fields in DB object
         item.title = form.title.data
         item.description = form.description.data
         item.item_type = form.item_type.data
@@ -538,10 +590,9 @@ def edit_portfolio_item(item_id):
         item.file_filename = file_filename_to_save
 
         try:
-            db.session.commit() # Commit changes to item
+            db.session.commit()
             flash('Portfolio item updated successfully!', 'success')
 
-            # Delete old file AFTER commit succeeds
             if old_filename_to_delete:
                 try:
                     old_file_path = get_portfolio_upload_path(old_filename_to_delete)
@@ -557,7 +608,7 @@ def edit_portfolio_item(item_id):
             print(f"Error updating portfolio item {item_id}: {e}")
             flash('Error updating portfolio item. Please try again.', 'danger')
 
-    return render_template('add_edit_portfolio_item.html', title='Edit Portfolio Item', form=form, is_edit=True, item=item, is_homepage=False) # Use sidebar
+    return render_template('add_edit_portfolio_item.html', title='Edit Portfolio Item', form=form, is_edit=True, item=item, is_homepage=False)
 
 
 @app.route('/portfolio/<int:item_id>/delete', methods=['POST'])
@@ -568,13 +619,12 @@ def delete_portfolio_item(item_id):
     if item.user_id != current_user.id:
         abort(403)
 
-    filename_to_delete = item.file_filename # Get filename before deleting DB record
+    filename_to_delete = item.file_filename
 
     try:
         db.session.delete(item)
         db.session.commit()
 
-        # Delete associated file AFTER successful DB deletion
         if filename_to_delete:
             try:
                 file_path = get_portfolio_upload_path(filename_to_delete)
@@ -598,17 +648,16 @@ def delete_portfolio_item(item_id):
 @login_required
 def profile():
     """Displays user profile and handles updates."""
-    # Ensure EditProfileForm is imported from forms
+    # Ensure EditProfileForm is imported
     form = EditProfileForm(obj=current_user)
 
-    # Manual pre-population for QuerySelectField might be needed if obj= fails
-    # Typically obj=current_user works if relationships are set up correctly
+    # Manual pre-population for QuerySelectField on GET
     if request.method == 'GET' and current_user.target_career_path:
-        form.target_career_path.data = current_user.target_career_path # Ensure this works
+        form.target_career_path.data = current_user.target_career_path
 
     if form.validate_on_submit():
         try:
-            # --- Handle CV Upload (using main uploads folder) ---
+            # Handle CV Upload
             cv_filename_to_save = current_user.cv_filename
             if form.cv_upload.data:
                 file = form.cv_upload.data
@@ -633,7 +682,7 @@ def profile():
                 file.save(file_path)
                 print(f"New CV saved via profile to: {file_path}")
 
-            # --- Update User Object ---
+            # Update User Object
             current_user.first_name = form.first_name.data
             current_user.last_name = form.last_name.data
             current_user.target_career_path = form.target_career_path.data
@@ -655,102 +704,11 @@ def profile():
              print(f"Error during profile update: {e}")
              flash('An error occurred while updating your profile. Please try again.', 'danger')
 
-    # --- Correct indentation for the final return statement ---
+    # Correct indentation for the final return statement
     return render_template('profile.html',
                            title='Edit Profile',
                            form=form,
                            is_homepage=False) # Use sidebar navigation
-
-
-# --- Recommendation Test Route ---
-@app.route('/recommendation-test', methods=['GET', 'POST'])
-@login_required
-def recommendation_test():
-    """Displays and processes the career recommendation test."""
-    form = RecommendationTestForm()
-    if form.validate_on_submit():
-        # --- Basic Rule-Based Scoring ---
-        scores = {"Data Analysis / Analytics": 0, "UX/UI Design": 0, "Software Engineering": 0, "Cybersecurity": 0}
-        answers = {
-            'q1': form.q1_hobby.data,
-            'q2': form.q2_approach.data,
-            'q3': form.q3_reward.data,
-            'q4': form.q4_feedback.data
-        }
-
-        # Q1 Scoring
-        if answers['q1'] == 'A': scores["Data Analysis / Analytics"] += 1
-        elif answers['q1'] == 'B': scores["UX/UI Design"] += 1
-        elif answers['q1'] == 'C': scores["Software Engineering"] += 1 # For future
-        elif answers['q1'] == 'D': scores["Cybersecurity"] += 1      # For future
-
-        # Q2 Scoring
-        if answers['q2'] == 'A': scores["Data Analysis / Analytics"] += 1
-        elif answers['q2'] == 'B': scores["UX/UI Design"] += 1
-        elif answers['q2'] == 'C': scores["Software Engineering"] += 1
-        elif answers['q2'] == 'D': scores["Cybersecurity"] += 1
-
-        # Q3 Scoring
-        if answers['q3'] == 'A': scores["Data Analysis / Analytics"] += 1
-        elif answers['q3'] == 'B': scores["UX/UI Design"] += 1
-        elif answers['q3'] == 'C': scores["Software Engineering"] += 1
-        elif answers['q3'] == 'D': scores["Cybersecurity"] += 1
-
-        # Q4 Scoring
-        if answers['q4'] == 'A': scores["Data Analysis / Analytics"] += 1
-        elif answers['q4'] == 'B': scores["UX/UI Design"] += 1
-        elif answers['q4'] == 'C': scores["Software Engineering"] += 1
-        elif answers['q4'] == 'D': scores["Cybersecurity"] += 1
-
-        # Determine highest score (simple version - ignores ties for now)
-        # Filter out paths we haven't seeded yet for recommendation
-        available_paths = {"Data Analysis / Analytics", "UX/UI Design"} # Add more as seeded
-        filtered_scores = {path: score for path, score in scores.items() if path in available_paths}
-
-        if not filtered_scores:
-             # Handle case where no available path got points (e.g., user chose only C/D)
-             recommended_path_name = "Data Analysis / Analytics" # Default recommendation
-        else:
-             recommended_path_name = max(filtered_scores, key=filtered_scores.get)
-
-        # Find the corresponding CareerPath object ID
-        recommended_path = CareerPath.query.filter_by(name=recommended_path_name).first()
-
-        if recommended_path:
-            # Redirect to results page, passing recommendation info
-            return redirect(url_for('recommendation_results',
-                                    recommended_path_id=recommended_path.id,
-                                    recommended_path_name=recommended_path.name))
-        else:
-            # Path not found in DB (shouldn't happen if seeded)
-            flash('Could not process recommendation. Please select a path manually.', 'warning')
-            return redirect(url_for('onboarding_form'))
-
-    # Render the test form on GET request or if POST validation fails
-    return render_template('recommendation_test.html',
-                           title="Career Recommendation Test",
-                           form=form,
-                           is_homepage=False) # Use sidebar layout
-
-# --- Recommendation Results Route ---
-@app.route('/recommendation-results') # GET only
-@login_required
-def recommendation_results():
-    """Displays the recommendation results and next steps."""
-    recommended_path_id = request.args.get('recommended_path_id', type=int)
-    recommended_path_name = request.args.get('recommended_path_name')
-
-    if not recommended_path_id or not recommended_path_name:
-        # If parameters are missing, redirect back to test or choice
-        flash('Recommendation results not found. Please try the test again.', 'warning')
-        return redirect(url_for('recommendation_test'))
-
-    return render_template('recommendation_results.html',
-                            title="Your Recommendation",
-                            recommended_path_id=recommended_path_id,
-                            recommended_path_name=recommended_path_name,
-                            is_homepage=False) # Use sidebar layout
-
 
 # --- Main execution ---
 if __name__ == '__main__':
@@ -763,5 +721,4 @@ if __name__ == '__main__':
         os.makedirs(portfolio_upload_dir)
 
     port = int(os.environ.get('PORT', 5000))
-    # Set host to '0.0.0.0' to be accessible externally
     app.run(debug=True, host='0.0.0.0', port=port)
