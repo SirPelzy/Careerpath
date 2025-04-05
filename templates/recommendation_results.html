@@ -5,34 +5,40 @@
 {% block content %}
 <div class="container mt-5 text-center">
     <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6">
+        <div class="col-md-8 col-lg-7">
             <h1 class="h2 mb-3">Recommendation Result</h1>
 
             {% if recommended_path_id and recommended_path_name %}
-                <div class="alert alert-success" role="alert">
-                    <h4 class="alert-heading">We Recommend: {{ recommended_path_name }}!</h4>
-                    <p>Based on your answers, this path seems like a good starting point for your interests and preferences.</p>
-                    <hr>
-                    <p class="mb-0">You can now proceed to complete your profile with this path selected, or choose a different one if you prefer.</p>
+                {# Display the Recommendation #}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body p-4">
+                         <i class="bi bi-lightbulb-fill fs-1 text-success mb-3"></i>
+                        <h4 class="card-title">We Recommend:</h4>
+                        <p class="display-6 text-success mb-3">{{ recommended_path_name }}</p>
+                        <p class="card-text text-muted">Based on your answers, this path aligns well with your indicated preferences and problem-solving style. It could be a great starting point for your tech journey!</p>
+                        {# Future: Could add more detail here about WHY it was recommended based on score breakdown #}
+                    </div>
                 </div>
 
-                <div class="d-grid gap-2 d-sm-flex justify-content-sm-center mt-4">
+                {# Options for Next Step #}
+                <p class="lead mb-3">What would you like to do next?</p>
+                <div class="d-grid gap-3 d-sm-flex justify-content-sm-center">
                     {# Button to accept and go to onboarding form with path pre-filled #}
-                    <a href="{{ url_for('onboarding_form', recommended_path_id=recommended_path_id) }}" class="btn btn-primary btn-lg px-4 gap-3">
-                        Accept & Continue Onboarding
+                    <a href="{{ url_for('onboarding_form', recommended_path_id=recommended_path_id) }}" class="btn btn-primary btn-lg px-4">
+                        <i class="bi bi-check-lg me-2"></i>Accept & Continue Onboarding
                     </a>
                     {# Button to go to onboarding form without pre-filling #}
                     <a href="{{ url_for('onboarding_form') }}" class="btn btn-outline-secondary btn-lg px-4">
                         Choose a Different Path
                     </a>
                 </div>
-            {% else %}
+
+            {% else %} {# Fallback if somehow parameters were lost #}
                 <div class="alert alert-warning" role="alert">
                     Could not retrieve recommendation results. Please try the test again.
                 </div>
                  <div class="mt-4">
                      <a href="{{ url_for('recommendation_test') }}" class="btn btn-secondary">Try Test Again</a>
-                     <a href="{{ url_for('onboarding') }}" class="btn btn-outline-secondary">Back to Start Choice</a>
                 </div>
             {% endif %}
 
@@ -43,7 +49,7 @@
                 </a>
             </div>
 
-        </div>
-    </div>
-</div>
+        </div> {# End Column #}
+    </div> {# End Row #}
+</div> {# End Container #}
 {% endblock %}
