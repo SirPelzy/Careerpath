@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Careerpath!{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-7">
+    <h2>{{ title }}</h2>
+    <p class="lead">Answer these questions to help us suggest a suitable starting path for you.</p>
+
+    {# --- Back Navigation Link --- #}
+    <div class="mb-4">
+      <a href="{{ url_for('onboarding') }}" class="text-decoration-none text-muted">
+        <i class="bi bi-arrow-left-circle me-1"></i>Back to Start Choice
+      </a>
+    </div>
+    {# --- End Back Navigation Link --- #}
+
+    <form method="POST" action="" novalidate>
+      {{ form.hidden_tag() }} {# Question 1 #}
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <fieldset class="mb-3">
+            <legend class="h6">{{ form.q1_hobby.label }}</legend>
+            {% if form.q1_hobby.errors %}
+              <div class="alert alert-danger py-1 px-2">
+                {% for error in form.q1_hobby.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+            {% for subfield in form.q1_hobby %}
+              <div class="form-check">
+                {{ subfield(class="form-check-input") }}
+                {{ subfield.label(class="form-check-label") }}
+              </div>
+            {% endfor %}
+          </fieldset>
+        </div>
+      </div>
+
+      {# Question 2 #}
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <fieldset class="mb-3">
+            <legend class="h6">{{ form.q2_approach.label }}</legend>
+             {% if form.q2_approach.errors %}
+              <div class="alert alert-danger py-1 px-2">
+                {% for error in form.q2_approach.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+            {% for subfield in form.q2_approach %}
+              <div class="form-check">
+                {{ subfield(class="form-check-input") }}
+                {{ subfield.label(class="form-check-label") }}
+              </div>
+            {% endfor %}
+          </fieldset>
+        </div>
+      </div>
+
+      {# Question 3 #}
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <fieldset class="mb-3">
+            <legend class="h6">{{ form.q3_reward.label }}</legend>
+             {% if form.q3_reward.errors %}
+              <div class="alert alert-danger py-1 px-2">
+                {% for error in form.q3_reward.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+            {% for subfield in form.q3_reward %}
+              <div class="form-check">
+                {{ subfield(class="form-check-input") }}
+                {{ subfield.label(class="form-check-label") }}
+              </div>
+            {% endfor %}
+          </fieldset>
+        </div>
+      </div>
+
+       {# Question 4 #}
+      <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+          <fieldset class="mb-3">
+            <legend class="h6">{{ form.q4_feedback.label }}</legend>
+             {% if form.q4_feedback.errors %}
+              <div class="alert alert-danger py-1 px-2">
+                {% for error in form.q4_feedback.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+            {% for subfield in form.q4_feedback %}
+              <div class="form-check">
+                {{ subfield(class="form-check-input") }}
+                {{ subfield.label(class="form-check-label") }}
+              </div>
+            {% endfor %}
+          </fieldset>
+        </div>
+      </div>
+
+      <div class="d-grid mt-4">
+         {{ form.submit(class="btn btn-primary btn-lg") }}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
