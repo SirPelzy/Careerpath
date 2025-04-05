@@ -4,12 +4,13 @@
 
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-md-8 col-lg-7">
-    <h2>{{ title }}</h2>
-    <p class="lead">Answer these questions to help us suggest a suitable starting path for you.</p>
+  {# Increased width: md-10, lg-8 #}
+  <div class="col-md-10 col-lg-8">
+    <h2 class="text-center">{{ title }}</h2>
+    <p class="lead text-center">Answer these questions to help us suggest a suitable starting path for you.</p>
 
     {# --- Back Navigation Link --- #}
-    <div class="mb-4">
+    <div class="my-4 text-center"> {# Centered the back link #}
       <a href="{{ url_for('onboarding') }}" class="text-decoration-none text-muted">
         <i class="bi bi-arrow-left-circle me-1"></i>Back to Start Choice
       </a>
@@ -17,90 +18,101 @@
     {# --- End Back Navigation Link --- #}
 
     <form method="POST" action="" novalidate>
-      {{ form.hidden_tag() }} {# Question 1 #}
-      <div class="card mb-4 shadow-sm">
-        <div class="card-body">
-          <fieldset class="mb-3">
-            <legend class="h6">{{ form.q1_hobby.label }}</legend>
-            {% if form.q1_hobby.errors %}
-              <div class="alert alert-danger py-1 px-2">
-                {% for error in form.q1_hobby.errors %}{{ error }}{% endfor %}
-              </div>
-            {% endif %}
-            {% for subfield in form.q1_hobby %}
+      {{ form.hidden_tag() }} {# --- Question 1 Block --- #}
+      <fieldset class="mb-4 pt-3"> {# Removed card, added padding top #}
+        <legend class="h6 mb-3">{{ form.q1_hobby.label }}</legend>
+        {% if form.q1_hobby.errors %}
+          <div class="alert alert-danger py-1 px-2 mb-2">
+            {% for error in form.q1_hobby.errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+        {# Use List Group for options #}
+        <ul class="list-group">
+          {% for subfield in form.q1_hobby %}
+            <li class="list-group-item">
               <div class="form-check">
                 {{ subfield(class="form-check-input") }}
-                {{ subfield.label(class="form-check-label") }}
+                {{ subfield.label(class="form-check-label w-100") }} {# Label takes full width #}
               </div>
-            {% endfor %}
-          </fieldset>
-        </div>
-      </div>
+            </li>
+          {% endfor %}
+        </ul>
+      </fieldset>
+      {# --- End Question 1 Block --- #}
 
-      {# Question 2 #}
-      <div class="card mb-4 shadow-sm">
-        <div class="card-body">
-          <fieldset class="mb-3">
-            <legend class="h6">{{ form.q2_approach.label }}</legend>
-             {% if form.q2_approach.errors %}
-              <div class="alert alert-danger py-1 px-2">
-                {% for error in form.q2_approach.errors %}{{ error }}{% endfor %}
-              </div>
-            {% endif %}
-            {% for subfield in form.q2_approach %}
+
+      {# --- Question 2 Block --- #}
+      <fieldset class="mb-4 border-top pt-3"> {# Add border top for separation #}
+        <legend class="h6 mb-3">{{ form.q2_approach.label }}</legend>
+        {% if form.q2_approach.errors %}
+          <div class="alert alert-danger py-1 px-2 mb-2">
+            {% for error in form.q2_approach.errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+        <ul class="list-group">
+          {% for subfield in form.q2_approach %}
+            <li class="list-group-item">
               <div class="form-check">
                 {{ subfield(class="form-check-input") }}
-                {{ subfield.label(class="form-check-label") }}
+                {{ subfield.label(class="form-check-label w-100") }}
               </div>
-            {% endfor %}
-          </fieldset>
-        </div>
-      </div>
+            </li>
+          {% endfor %}
+        </ul>
+      </fieldset>
+      {# --- End Question 2 Block --- #}
 
-      {# Question 3 #}
-      <div class="card mb-4 shadow-sm">
-        <div class="card-body">
-          <fieldset class="mb-3">
-            <legend class="h6">{{ form.q3_reward.label }}</legend>
-             {% if form.q3_reward.errors %}
-              <div class="alert alert-danger py-1 px-2">
-                {% for error in form.q3_reward.errors %}{{ error }}{% endfor %}
-              </div>
-            {% endif %}
-            {% for subfield in form.q3_reward %}
+
+      {# --- Question 3 Block --- #}
+       <fieldset class="mb-4 border-top pt-3">
+        <legend class="h6 mb-3">{{ form.q3_reward.label }}</legend>
+        {% if form.q3_reward.errors %}
+          <div class="alert alert-danger py-1 px-2 mb-2">
+            {% for error in form.q3_reward.errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+        <ul class="list-group">
+          {% for subfield in form.q3_reward %}
+            <li class="list-group-item">
               <div class="form-check">
                 {{ subfield(class="form-check-input") }}
-                {{ subfield.label(class="form-check-label") }}
+                {{ subfield.label(class="form-check-label w-100") }}
               </div>
-            {% endfor %}
-          </fieldset>
-        </div>
-      </div>
+            </li>
+          {% endfor %}
+        </ul>
+      </fieldset>
+      {# --- End Question 3 Block --- #}
 
-       {# Question 4 #}
-      <div class="card mb-4 shadow-sm">
-        <div class="card-body">
-          <fieldset class="mb-3">
-            <legend class="h6">{{ form.q4_feedback.label }}</legend>
-             {% if form.q4_feedback.errors %}
-              <div class="alert alert-danger py-1 px-2">
-                {% for error in form.q4_feedback.errors %}{{ error }}{% endfor %}
-              </div>
-            {% endif %}
-            {% for subfield in form.q4_feedback %}
+
+       {# --- Question 4 Block --- #}
+       <fieldset class="mb-4 border-top pt-3">
+        <legend class="h6 mb-3">{{ form.q4_feedback.label }}</legend>
+        {% if form.q4_feedback.errors %}
+          <div class="alert alert-danger py-1 px-2 mb-2">
+            {% for error in form.q4_feedback.errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+        <ul class="list-group">
+          {% for subfield in form.q4_feedback %}
+            <li class="list-group-item">
               <div class="form-check">
                 {{ subfield(class="form-check-input") }}
-                {{ subfield.label(class="form-check-label") }}
+                {{ subfield.label(class="form-check-label w-100") }}
               </div>
-            {% endfor %}
-          </fieldset>
-        </div>
-      </div>
+            </li>
+          {% endfor %}
+        </ul>
+      </fieldset>
+      {# --- End Question 4 Block --- #}
 
-      <div class="d-grid mt-4">
+      {# --- Submit Button --- #}
+      <div class="d-grid mt-4 mb-5"> {# Added bottom margin #}
          {{ form.submit(class="btn btn-primary btn-lg") }}
       </div>
+      {# --- End Submit Button --- #}
+
     </form>
-  </div>
-</div>
+  </div> {# End Column #}
+</div> {# End Row #}
 {% endblock %}
