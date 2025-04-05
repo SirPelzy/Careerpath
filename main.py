@@ -553,7 +553,7 @@ def add_portfolio_item():
             description=form.description.data,
             item_type=form.item_type.data,
             link_url=link_url if link_url else None,
-            file_filename=file_filename_to_save
+            file_filename=file_filename_to_save,
             # --- << NEW: Set association IDs >> ---
             associated_step_id=assoc_step_id,
             associated_milestone_id=assoc_milestone_id
