@@ -507,6 +507,17 @@ def add_portfolio_item():
     """Handles adding a new portfolio item."""
     # Ensure PortfolioItemForm is imported
     form = PortfolioItemForm()
+    # --- << NEW: Check for association ID on GET >> ---
+    step_id_from_url = request.args.get('step_id', type=int)
+    milestone_id_from_url = request.args.get('milestone_id', type=int) # Allow for future use
+    # You might want to fetch the Step/Milestone object here to display its name
+    linked_item_name = None
+    if step_id_from_url:
+        linked_step = Step.query.get(step_id_from_url)
+        if linked_step:
+            linked_item_name = f"Step: {linked_step.name}"
+    # Add similar logic for milestone_id if needed
+    # --- << End Check >> ---
     if form.validate_on_submit():
         link_url = form.link_url.data
         file_filename_to_save = None
@@ -528,6 +539,14 @@ def add_portfolio_item():
                 flash('Error uploading file. Please try again.', 'danger')
                 file_filename_to_save = None
 
+        # --- << NEW: Get association IDs from hidden form fields (if added) >> ---
+        # Or simply use the variables captured during the GET request if not editing
+        # For simplicity, let's reuse the IDs captured on GET for the initial Add.
+        # If editing, we'd handle association differently.
+        assoc_step_id = step_id_from_url # Use ID captured when page loaded
+        assoc_milestone_id = milestone_id_from_url # Use ID captured when page loaded
+        # --- << End Get Association >> ---
+
         new_item = PortfolioItem(
             user_id=current_user.id,
             title=form.title.data,
@@ -535,6 +554,10 @@ def add_portfolio_item():
             item_type=form.item_type.data,
             link_url=link_url if link_url else None,
             file_filename=file_filename_to_save
+            # --- << NEW: Set association IDs >> ---
+            associated_step_id=assoc_step_id,
+            associated_milestone_id=assoc_milestone_id
+            # --- << End Set Association >> ---
         )
         try:
             db.session.add(new_item)
@@ -546,7 +569,14 @@ def add_portfolio_item():
             print(f"Error adding portfolio item to DB: {e}")
             flash('Error saving portfolio item. Please try again.', 'danger')
 
-    return render_template('add_edit_portfolio_item.html', title='Add Portfolio Item', form=form, is_edit=False, is_homepage=False)
+    return render_template('add_edit_portfolio_item.html', 
+                           title='Add Portfolio Item', 
+                           form=form, 
+                           is_edit=False, 
+                           step_id=step_id_from_url, # Pass ID
+                           milestone_id=milestone_id_from_url, # Pass ID
+                           linked_item_name=linked_item_name, # Pass name for display
+                           is_homepage=False)
 
 
 @app.route('/portfolio/<int:item_id>/edit', methods=['GET', 'POST'])
