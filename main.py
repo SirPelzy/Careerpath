@@ -38,6 +38,15 @@ login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 db.init_app(app) # Initialize SQLAlchemy with the app context
 
+print("DEBUG: Attempting to initialize Migrate...")
+try:
+    # Ensure Migrate is imported at the top: from flask_migrate import Migrate
+    migrate = Migrate(app, db)
+    print("DEBUG: Migrate initialized successfully.")
+except Exception as e:
+    print(f"DEBUG: ERROR initializing Migrate: {e}")
+    migrate = None # Prevent further errors if init fails
+
 migrate = Migrate(app, db) # Initialize Flask-Migrate
 
 # --- Context Processor for Jinja ---
