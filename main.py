@@ -560,61 +560,6 @@ def profile():
                            is_homepage=False) # Use sidebar navigation
 
 
-# --- <<< TEMPORARY ADMIN ROUTE FOR DB INIT & SEEDING >>> ---
-# !! IMPORTANT !! Remove or secure this route in production!
-INIT_DB_SECRET_KEY = os.environ.get('INIT_DB_SECRET_KEY', 'replace-this-with-a-very-secret-key-9876')
-
-@app.route(f'/admin/init-db/{INIT_DB_SECRET_KEY}')
-def init_database():
-    """Temporary route to initialize the database (create missing tables) and seed path data."""
-    print("Attempting database initialization and seeding...")
-    # (Keep the seeding logic here as provided before)
-    # ... Make sure this function has correct indentation internally ...
-    try:
-        with app.app_context():
-            db.create_all()
-            print("Database tables checked/created.")
-            # Seed Career Paths...
-            if not CareerPath.query.first():
-                print("Populating initial Career Paths...")
-                # ... paths list and db.session.add_all(paths) ...
-                db.session.commit()
-                print("Career Paths added.")
-            else:
-                print("Career Paths already exist.")
-
-            # Seed Data Analytics Path...
-            print("Checking for Data Analytics path seeding...")
-            da_path = CareerPath.query.filter_by(name="Data Analysis / Analytics").first()
-            if da_path and not Milestone.query.filter_by(career_path_id=da_path.id).first():
-                print(f"Seeding path for '{da_path.name}'...")
-                # ... ALL THE MILESTONE/STEP/RESOURCE CREATION CODE ...
-                # (Ensure this block is correctly indented)
-                # Example start:
-                resources_to_add = []
-                m1 = Milestone(name="Introduction & Foundation", sequence=10, career_path_id=da_path.id); db.session.add(m1); db.session.flush()
-                s1_1 = Step(name="Understand the Data Analyst Role", sequence=10, estimated_time_minutes=60, milestone_id=m1.id)
-                # ... etc ...
-                # --- Add all collected resources ---
-                if resources_to_add:
-                    db.session.add_all(resources_to_add)
-                db.session.commit()
-                print(f"Path '{da_path.name}' seeded successfully.")
-            elif da_path:
-                 print(f"Path '{da_path.name}' milestones already seem to exist. Skipping seeding.")
-            else:
-                 print("Data Analysis career path not found in DB, skipping seeding.")
-
-        flash("Database initialization and seeding check complete.", 'info')
-        return redirect(url_for('home'))
-    except Exception as e:
-        db.session.rollback()
-        print(f"Error during DB initialization/seeding: {e}")
-        flash(f"Error during DB initialization/seeding: {e}", 'danger')
-        return redirect(url_for('home'))
-# --- End of Temporary Init Route ---
-
-
 # --- Main execution ---
 if __name__ == '__main__':
     # Ensure the main upload folder exists
