@@ -6,10 +6,29 @@
 <div class="row justify-content-center">
   <div class="col-md-8 col-lg-7">
     <h2>{{ 'Edit' if is_edit else 'Add New' }} Portfolio Item</h2>
+    {# --- << NEW: Display Linked Item Info >> --- #}
+    {% if not is_edit and linked_item_name %}
+    <div class="alert alert-info py-2 px-3">
+        Adding proof related to: <strong>{{ linked_item_name }}</strong>
+    </div>
+    {% endif %}
+    {# --- << End Display Linked Item Info >> --- #}
+      
     <p class="text-muted">Showcase your projects, certificates, and accomplishments.</p>
 
     {# IMPORTANT: Add enctype for file uploads #}
     <form method="POST" action="" enctype="multipart/form-data" novalidate>
+      {{ form.hidden_tag() }} {# --- << NEW: Hidden fields for association IDs >> --- #}
+      {% if not is_edit %} {# Only include hidden fields when ADDING via specific link #}
+          {% if step_id %}
+          <input type="hidden" name="associated_step_id" value="{{ step_id }}">
+          {% endif %}
+          {% if milestone_id %}
+          <input type="hidden" name="associated_milestone_id" value="{{ milestone_id }}">
+          {% endif %}
+      {% endif %}
+      {# --- << End Hidden fields >> --- #}
+        
       {{ form.hidden_tag() }} <div class="mb-3">
         {{ form.title.label(class="form-label") }}
         {{ form.title(class="form-control" + (" is-invalid" if form.title.errors else ""), **{'aria-describedby': 'titleHelp'}) }}
