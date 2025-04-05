@@ -54,7 +54,7 @@ def home():
     # Pass is_homepage=True for the homepage
     return render_template('home.html', is_homepage=True)
 
-# --- Combined Dashboard Route ---
+# --- Combined Dashboard Route with Resource Personalization ---
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -71,20 +71,34 @@ def dashboard():
     total_steps_in_path = 0
     total_completed_steps = 0
     overall_percent_complete = 0
+    # Resource Personalization
+    recommended_resource_ids = set() # <-- Initialize set for recommendations
 
     if target_path:
         # Fetch milestones ordered by sequence
         milestones = Milestone.query.filter_by(career_path_id=target_path.id).order_by(Milestone.sequence).all()
 
-        # Get all Step IDs for the user's current path
-        current_path_step_ids_query = Step.query.join(Milestone).filter(
-            Milestone.career_path_id == target_path.id
-        ).with_entities(Step.id)
-        current_path_step_ids = {step_id for step_id, in current_path_step_ids_query.all()}
+        # Fetch all Step IDs AND associated Resource details for the user's current path efficiently
+        path_steps_resources_query = db.session.query(
+                Step.id,
+                Resource.id,
+                Resource.name,
+                Resource.resource_type
+            ).select_from(Step).join(
+                Milestone, Step.milestone_id == Milestone.id
+            ).outerjoin( # Use outerjoin to include steps that might not have resources yet
+                Resource, Step.id == Resource.step_id
+            ).filter(
+                Milestone.career_path_id == target_path.id
+            )
+        path_steps_resources = path_steps_resources_query.all()
+
+        # Get unique Step IDs from the fetched data
+        current_path_step_ids = {step_id for step_id, _, _, _ in path_steps_resources if step_id is not None}
         total_steps_in_path = len(current_path_step_ids)
 
         if current_path_step_ids: # Only proceed if the path has steps
-            # Get IDs of completed steps for the user within this path
+            # Get IDs of completed steps (as before)
             completed_statuses_query = UserStepStatus.query.filter(
                 UserStepStatus.user_id == current_user.id,
                 UserStepStatus.status == 'completed',
@@ -93,11 +107,11 @@ def dashboard():
             completed_step_ids = {step_id for step_id, in completed_statuses_query.all()}
             total_completed_steps = len(completed_step_ids)
 
-            # Calculate Overall Progress Percentage
+            # Calculate Overall Progress Percentage (as before)
             if total_steps_in_path > 0:
                 overall_percent_complete = round((total_completed_steps / total_steps_in_path) * 100)
 
-            # Calculate Per-Milestone Progress
+            # Calculate Per-Milestone Progress (as before)
             for milestone in milestones:
                 total_steps_in_milestone = Step.query.filter_by(milestone_id=milestone.id).count()
                 if total_steps_in_milestone > 0:
@@ -113,7 +127,7 @@ def dashboard():
                 else:
                     milestone_progress[milestone.id] = {'completed': 0, 'total': 0, 'percent': 0}
 
-            # --- Timeline Estimation Logic ---
+            # --- Timeline Estimation Logic (as before) ---
             if current_user.time_commitment:
                 try:
                     commitment_str = current_user.time_commitment
@@ -146,8 +160,49 @@ def dashboard():
                     timeline_estimate = "Could not calculate timeline."
             else: # No time commitment set
                 timeline_estimate = "Set weekly time commitment for estimate."
+
+
+            # --- << NEW >> Calculate Recommended Resource IDs ---
+            user_style = current_user.learning_style
+            user_interests_str = current_user.interests or ""
+            # Basic keyword extraction
+            interest_keywords = {
+                keyword.strip().lower()
+                for keyword in user_interests_str.replace(',', ' ').split()
+                if len(keyword.strip()) > 2
+            }
+
+            # Define mapping from style to resource types
+            style_to_type_map = {
+                'Visual': ['Video', 'Project', 'Course', 'Guide', 'Platform'],
+                'Auditory': ['Video', 'Course'], # Limited options based on current types
+                'Reading/Writing': ['Article', 'Documentation', 'Guide', 'Tutorial', 'Resource'],
+                'Kinesthetic/Practical': ['Project', 'Practice', 'Course', 'Tool', 'Tutorial']
+            }
+            preferred_types = style_to_type_map.get(user_style, [])
+
+            # Iterate through all resources fetched for the path
+            for _step_id, resource_id, resource_name, resource_type in path_steps_resources:
+                if resource_id is None: continue # Skip steps with no resources
+
+                is_recommended = False
+                # 1. Check Learning Style Match
+                if resource_type and resource_type in preferred_types: # Check resource_type is not None
+                    is_recommended = True
+
+                # 2. Check Interest Match (if not already recommended)
+                if not is_recommended and interest_keywords and resource_name: # Check resource_name is not None
+                    resource_name_lower = resource_name.lower()
+                    if any(keyword in resource_name_lower for keyword in interest_keywords):
+                        is_recommended = True
+
+                if is_recommended:
+                    recommended_resource_ids.add(resource_id)
+            # --- End Recommended Resource Calculation ---
+
         else: # Path has no steps
              timeline_estimate = "No steps defined for this path."
+
 
     # --- Render the dashboard template ---
     return render_template('dashboard.html',
@@ -160,7 +215,9 @@ def dashboard():
                            total_steps_in_path=total_steps_in_path,
                            total_completed_steps=total_completed_steps,
                            overall_percent_complete=overall_percent_complete,
+                           recommended_resource_ids=recommended_resource_ids, # <-- Pass the new set
                            is_homepage=False) # Pass flag for layout
+
 
 # --- Authentication Routes ---
 @app.route('/register', methods=['GET', 'POST'])
@@ -558,192 +615,6 @@ def profile():
                            title='Edit Profile',
                            form=form,
                            is_homepage=False) # Use sidebar navigation
-
-
-
-# --- <<< TEMPORARY ADMIN ROUTE FOR DB INIT & SEEDING >>> ---
-# !! IMPORTANT !! Remove or secure this route in production!
-INIT_DB_SECRET_KEY = os.environ.get('INIT_DB_SECRET_KEY', 'replace-this-with-a-very-secret-key-9876')
-
-@app.route(f'/admin/init-db/{INIT_DB_SECRET_KEY}')
-def init_database():
-    """Temporary route to initialize the database and seed path data."""
-    print("Attempting database initialization and seeding...")
-    try:
-        with app.app_context():
-            # Create all tables that don't exist
-            db.create_all()
-            print("Database tables checked/created.")
-
-            # --- Seed Initial Career Paths (if needed) ---
-            # ... (Keep existing CareerPath seeding logic here) ...
-
-            # --- Seed Data Analytics Path (if needed) ---
-            # ... (Keep existing Data Analytics seeding logic here) ...
-
-
-            # --- <<< ADD THIS NEW BLOCK FOR UX/UI SEEDING >>> ---
-            print("Checking for UX/UI Design path seeding...")
-            uxui_path = CareerPath.query.filter_by(name="UX/UI Design").first()
-
-            # Check if milestones for this specific path already exist
-            if uxui_path and not Milestone.query.filter_by(career_path_id=uxui_path.id).first():
-                print(f"Seeding path for '{uxui_path.name}'...")
-
-                # Use lists to collect objects for bulk add if preferred, or add individually
-                resources_to_add_ux = [] # Separate list for this path's resources
-
-                # --- Milestone 1: Introduction to UX/UI ---
-                m1_ux = Milestone(name="Introduction to UX/UI Design", sequence=10, career_path_id=uxui_path.id); db.session.add(m1_ux); db.session.flush()
-                s1_1_ux = Step(name="Understand UX vs UI", sequence=10, estimated_time_minutes=60, milestone_id=m1_ux.id)
-                s1_2_ux = Step(name="Explore UX/UI Career Paths & Roles", sequence=20, estimated_time_minutes=90, milestone_id=m1_ux.id)
-                s1_3_ux = Step(name="Learn the Design Thinking Process", sequence=30, estimated_time_minutes=120, milestone_id=m1_ux.id)
-                db.session.add_all([s1_1_ux, s1_2_ux, s1_3_ux]); db.session.flush()
-                # !!! REPLACE PLACEHOLDER URLs BELOW !!!
-                resources_to_add_ux.append(Resource(name="UX vs UI Explained (CareerFoundry)", url="#placeholder_uxui_cf_article", resource_type="Article", step_id=s1_1_ux.id))
-                resources_to_add_ux.append(Resource(name="Google UX Design Certificate Intro (Coursera)", url="#placeholder_uxui_google_intro", resource_type="Course", step_id=s1_2_ux.id))
-                resources_to_add_ux.append(Resource(name="Design Thinking Overview (IDEO)", url="#placeholder_uxui_ideo_dt", resource_type="Resource", step_id=s1_3_ux.id))
-
-                # --- Milestone 2: Core Design Principles ---
-                m2_ux = Milestone(name="Core Design Principles", sequence=20, career_path_id=uxui_path.id); db.session.add(m2_ux); db.session.flush()
-                s2_1_ux = Step(name="Visual Hierarchy & Layout", sequence=10, estimated_time_minutes=120, milestone_id=m2_ux.id)
-                s2_2_ux = Step(name="Color Theory Basics", sequence=20, estimated_time_minutes=90, milestone_id=m2_ux.id)
-                s2_3_ux = Step(name="Typography Fundamentals", sequence=30, estimated_time_minutes=90, milestone_id=m2_ux.id)
-                s2_4_ux = Step(name="Usability Heuristics (Nielsen's 10)", sequence=40, estimated_time_minutes=120, milestone_id=m2_ux.id)
-                db.session.add_all([s2_1_ux, s2_2_ux, s2_3_ux, s2_4_ux]); db.session.flush()
-                # !!! REPLACE PLACEHOLDER URLs BELOW !!!
-                resources_to_add_ux.append(Resource(name="Laws of UX (Website)", url="#placeholder_uxui_laws_ux", resource_type="Resource", step_id=s2_1_ux.id))
-                resources_to_add_ux.append(Resource(name="Color Theory (Interaction Design Foundation)", url="#placeholder_uxui_idf_color", resource_type="Article", step_id=s2_2_ux.id))
-                resources_to_add_ux.append(Resource(name="Typography Guide (Material Design)", url="#placeholder_uxui_material_type", resource_type="Guide", step_id=s2_3_ux.id))
-                resources_to_add_ux.append(Resource(name="10 Usability Heuristics (NN/g)", url="#placeholder_uxui_nng_heuristics", resource_type="Article", step_id=s2_4_ux.id))
-
-                # --- Milestone 3: User Research Fundamentals ---
-                m3_ux = Milestone(name="User Research Fundamentals", sequence=30, career_path_id=uxui_path.id); db.session.add(m3_ux); db.session.flush()
-                s3_1_ux = Step(name="Creating User Personas", sequence=10, estimated_time_minutes=120, milestone_id=m3_ux.id)
-                s3_2_ux = Step(name="Conducting User Interviews", sequence=20, estimated_time_minutes=180, milestone_id=m3_ux.id)
-                s3_3_ux = Step(name="Survey Design Basics", sequence=30, estimated_time_minutes=90, milestone_id=m3_ux.id)
-                s3_4_ux = Step(name="Introduction to Usability Testing", sequence=40, estimated_time_minutes=180, milestone_id=m3_ux.id)
-                db.session.add_all([s3_1_ux, s3_2_ux, s3_3_ux, s3_4_ux]); db.session.flush()
-                # !!! REPLACE PLACEHOLDER URLs BELOW !!!
-                resources_to_add_ux.append(Resource(name="Personas Guide (Interaction Design Foundation)", url="#placeholder_uxui_idf_personas", resource_type="Article", step_id=s3_1_ux.id))
-                resources_to_add_ux.append(Resource(name="User Interview Guide (NN/g)", url="#placeholder_uxui_nng_interviews", resource_type="Article", step_id=s3_2_ux.id))
-                resources_to_add_ux.append(Resource(name="Survey Guide (SurveyMonkey)", url="#placeholder_uxui_sm_surveys", resource_type="Guide", step_id=s3_3_ux.id))
-                resources_to_add_ux.append(Resource(name="Usability Testing 101 (NN/g)", url="#placeholder_uxui_nng_testing", resource_type="Article", step_id=s3_4_ux.id))
-
-                # --- Milestone 4: IA & User Flows ---
-                m4_ux = Milestone(name="Information Architecture & User Flows", sequence=40, career_path_id=uxui_path.id); db.session.add(m4_ux); db.session.flush()
-                s4_1_ux = Step(name="Information Architecture Basics", sequence=10, estimated_time_minutes=120, milestone_id=m4_ux.id)
-                s4_2_ux = Step(name="Creating Sitemaps", sequence=20, estimated_time_minutes=90, milestone_id=m4_ux.id)
-                s4_3_ux = Step(name="Mapping User Flows", sequence=30, estimated_time_minutes=180, milestone_id=m4_ux.id)
-                s4_4_ux = Step(name="Introduction to Card Sorting", sequence=40, estimated_time_minutes=60, milestone_id=m4_ux.id)
-                db.session.add_all([s4_1_ux, s4_2_ux, s4_3_ux, s4_4_ux]); db.session.flush()
-                # !!! REPLACE PLACEHOLDER URLs BELOW !!!
-                resources_to_add_ux.append(Resource(name="Complete Beginner's Guide to IA (UX Booth)", url="#placeholder_uxui_uxbooth_ia", resource_type="Article", step_id=s4_1_ux.id))
-                resources_to_add_ux.append(Resource(name="Sitemaps Tutorial (Figma)", url="#placeholder_uxui_figma_sitemaps", resource_type="Tutorial", step_id=s4_2_ux.id))
-                resources_to_add_ux.append(Resource(name="User Flow Guide (Adobe XD)", url="#placeholder_uxui_adobe_flows", resource_type="Guide", step_id=s4_3_ux.id))
-                resources_to_add_ux.append(Resource(name="Card Sorting Intro (NN/g)", url="#placeholder_uxui_nng_cardsort", resource_type="Article", step_id=s4_4_ux.id))
-
-                # --- Milestone 5: Wireframing & Prototyping ---
-                m5_ux = Milestone(name="Wireframing & Prototyping", sequence=50, career_path_id=uxui_path.id); db.session.add(m5_ux); db.session.flush()
-                s5_1_ux = Step(name="Understanding Wireframe Fidelity", sequence=10, estimated_time_minutes=60, milestone_id=m5_ux.id)
-                s5_2_ux = Step(name="Creating Low-Fidelity Wireframes", sequence=20, estimated_time_minutes=180, milestone_id=m5_ux.id)
-                s5_3_ux = Step(name="Building High-Fidelity Wireframes/Mockups", sequence=30, estimated_time_minutes=300, milestone_id=m5_ux.id)
-                s5_4_ux = Step(name="Creating Interactive Prototypes", sequence=40, estimated_time_minutes=300, milestone_id=m5_ux.id)
-                db.session.add_all([s5_1_ux, s5_2_ux, s5_3_ux, s5_4_ux]); db.session.flush()
-                # !!! REPLACE PLACEHOLDER URLs BELOW !!!
-                resources_to_add_ux.append(Resource(name="Wireframing Guide (CareerFoundry)", url="#placeholder_uxui_cf_wireframe", resource_type="Guide", step_id=s5_1_ux.id))
-                resources_to_add_ux.append(Resource(name="Low-Fi Wireframing Tools (Blog)", url="#placeholder_uxui_blog_lowfi", resource_type="Article", step_id=s5_2_ux.id))
-                resources_to_add_ux.append(Resource(name="Hi-Fi Wireframing Tutorial (Figma YT)", url="#placeholder_uxui_figmayt_hifi", resource_type="Video", step_id=s5_3_ux.id))
-                resources_to_add_ux.append(Resource(name="Prototyping in Figma (Figma Docs)", url="#placeholder_uxui_figmadocs_proto", resource_type="Documentation", step_id=s5_4_ux.id))
-
-                # --- Milestone 6: Mastering Design Tools (Figma) ---
-                m6_ux = Milestone(name="Mastering Design Tools (Figma Focus)", sequence=60, career_path_id=uxui_path.id); db.session.add(m6_ux); db.session.flush()
-                s6_1_ux = Step(name="Figma Interface & Basics", sequence=10, estimated_time_minutes=240, milestone_id=m6_ux.id)
-                s6_2_ux = Step(name="Using Auto Layout", sequence=20, estimated_time_minutes=180, milestone_id=m6_ux.id)
-                s6_3_ux = Step(name="Working with Components & Variants", sequence=30, estimated_time_minutes=300, milestone_id=m6_ux.id)
-                s6_4_ux = Step(name="Exploring Figma Plugins", sequence=40, estimated_time_minutes=60, milestone_id=m6_ux.id)
-                s6_5_ux = Step(name="Practice Project in Figma", sequence=50, estimated_time_minutes=600, milestone_id=m6_ux.id)
-                db.session.add_all([s6_1_ux, s6_2_ux, s6_3_ux, s6_4_ux, s6_5_ux]); db.session.flush()
-                # !!! REPLACE PLACEHOLDER URLs BELOW !!!
-                resources_to_add_ux.append(Resource(name="Figma Beginners Tutorial (YT)", url="#placeholder_uxui_yt_figmabasic", resource_type="Video", step_id=s6_1_ux.id))
-                resources_to_add_ux.append(Resource(name="Figma Auto Layout Guide (Figma)", url="#placeholder_uxui_figma_autolayout", resource_type="Guide", step_id=s6_2_ux.id))
-                resources_to_add_ux.append(Resource(name="Figma Components Tutorial (YT)", url="#placeholder_uxui_yt_components", resource_type="Video", step_id=s6_3_ux.id))
-                resources_to_add_ux.append(Resource(name="Top Figma Plugins (Blog)", url="#placeholder_uxui_blog_plugins", resource_type="Article", step_id=s6_4_ux.id))
-                resources_to_add_ux.append(Resource(name="Design a Mobile App (YT Project)", url="#placeholder_uxui_yt_project", resource_type="Project", step_id=s6_5_ux.id))
-
-                # --- Milestone 7: Visual Design & UI ---
-                m7_ux = Milestone(name="Visual Design & UI Details", sequence=70, career_path_id=uxui_path.id); db.session.add(m7_ux); db.session.flush()
-                s7_1_ux = Step(name="Creating Style Guides", sequence=10, estimated_time_minutes=120, milestone_id=m7_ux.id)
-                s7_2_ux = Step(name="Introduction to Design Systems", sequence=20, estimated_time_minutes=180, milestone_id=m7_ux.id)
-                s7_3_ux = Step(name="Web Accessibility Basics (WCAG)", sequence=30, estimated_time_minutes=240, milestone_id=m7_ux.id)
-                s7_4_ux = Step(name="Using UI Kits & Iconography", sequence=40, estimated_time_minutes=120, milestone_id=m7_ux.id)
-                db.session.add_all([s7_1_ux, s7_2_ux, s7_3_ux, s7_4_ux]); db.session.flush()
-                # !!! REPLACE PLACEHOLDER URLs BELOW !!!
-                resources_to_add_ux.append(Resource(name="Style Guide Examples (Blog)", url="#placeholder_uxui_blog_styleguide", resource_type="Article", step_id=s7_1_ux.id))
-                resources_to_add_ux.append(Resource(name="Design Systems Intro (InVision)", url="#placeholder_uxui_invision_ds", resource_type="Article", step_id=s7_2_ux.id))
-                resources_to_add_ux.append(Resource(name="WCAG Overview (W3C)", url="#placeholder_uxui_w3c_wcag", resource_type="Documentation", step_id=s7_3_ux.id))
-                resources_to_add_ux.append(Resource(name="Free UI Kits for Figma (Resource)", url="#placeholder_uxui_resource_uikits", resource_type="Resource", step_id=s7_4_ux.id))
-
-                # --- Milestone 8: Building Your UX/UI Portfolio ---
-                m8_ux = Milestone(name="Building Your UX/UI Portfolio", sequence=80, career_path_id=uxui_path.id); db.session.add(m8_ux); db.session.flush()
-                s8_1_ux = Step(name="Selecting Portfolio Projects", sequence=10, estimated_time_minutes=60, milestone_id=m8_ux.id)
-                s8_2_ux = Step(name="Structuring a UX Case Study", sequence=20, estimated_time_minutes=180, milestone_id=m8_ux.id)
-                s8_3_ux = Step(name="Choosing a Portfolio Platform (Behance, Dribbble, etc.)", sequence=30, estimated_time_minutes=120, milestone_id=m8_ux.id)
-                s8_4_ux = Step(name="Create & Refine 2-3 Case Studies", sequence=40, estimated_time_minutes=1200, milestone_id=m8_ux.id)
-                db.session.add_all([s8_1_ux, s8_2_ux, s8_3_ux, s8_4_ux]); db.session.flush()
-                # !!! REPLACE PLACEHOLDER URLs BELOW !!!
-                resources_to_add_ux.append(Resource(name="How to Choose Projects (Blog)", url="#placeholder_uxui_blog_projects", resource_type="Article", step_id=s8_1_ux.id))
-                resources_to_add_ux.append(Resource(name="UX Case Study Guide (Medium)", url="#placeholder_uxui_medium_casestudy", resource_type="Article", step_id=s8_2_ux.id))
-                resources_to_add_ux.append(Resource(name="Behance", url="https://www.behance.net/", resource_type="Platform", step_id=s8_3_ux.id))
-                resources_to_add_ux.append(Resource(name="Dribbble", url="https://dribbble.com/", resource_type="Platform", step_id=s8_3_ux.id))
-
-                # --- Milestone 9: Collaboration & Handoff ---
-                m9_ux = Milestone(name="Collaboration & Handoff", sequence=90, career_path_id=uxui_path.id); db.session.add(m9_ux); db.session.flush()
-                s9_1_ux = Step(name="Working Effectively with Developers", sequence=10, estimated_time_minutes=120, milestone_id=m9_ux.id)
-                s9_2_ux = Step(name="Creating Design Specifications", sequence=20, estimated_time_minutes=90, milestone_id=m9_ux.id)
-                s9_3_ux = Step(name="Using Handoff Features (Figma Inspect)", sequence=30, estimated_time_minutes=60, milestone_id=m9_ux.id)
-                db.session.add_all([s9_1_ux, s9_2_ux, s9_3_ux]); db.session.flush()
-                # !!! REPLACE PLACEHOLDER URLs BELOW !!!
-                resources_to_add_ux.append(Resource(name="Designer/Developer Collaboration (Abstract)", url="#placeholder_uxui_abstract_collab", resource_type="Article", step_id=s9_1_ux.id))
-                resources_to_add_ux.append(Resource(name="Design Specs Guide (Zeplin Blog)", url="#placeholder_uxui_zeplin_specs", resource_type="Article", step_id=s9_2_ux.id))
-                resources_to_add_ux.append(Resource(name="Figma Inspect Mode (Figma Docs)", url="#placeholder_uxui_figmadocs_inspect", resource_type="Documentation", step_id=s9_3_ux.id))
-
-                # --- Milestone 10: Job Search & Interview Prep (UX/UI) ---
-                m10_ux = Milestone(name="Job Search & Interview Prep (UX/UI)", sequence=100, career_path_id=uxui_path.id); db.session.add(m10_ux); db.session.flush()
-                s10_1_ux = Step(name="Tailoring Your UX/UI Resume", sequence=10, estimated_time_minutes=120, milestone_id=m10_ux.id)
-                s10_2_ux = Step(name="Preparing Your Portfolio for Review", sequence=20, estimated_time_minutes=180, milestone_id=m10_ux.id)
-                s10_3_ux = Step(name="Common UX/UI Interview Questions", sequence=30, estimated_time_minutes=180, milestone_id=m10_ux.id)
-                s10_4_ux = Step(name="Understanding Design Challenges & Whiteboard Tests", sequence=40, estimated_time_minutes=240, milestone_id=m10_ux.id)
-                db.session.add_all([s10_1_ux, s10_2_ux, s10_3_ux, s10_4_ux]); db.session.flush()
-                 # !!! REPLACE PLACEHOLDER URLs BELOW !!!
-                resources_to_add_ux.append(Resource(name="UX Resume Tips (NN/g)", url="#placeholder_uxui_nng_resume", resource_type="Article", step_id=s10_1_ux.id))
-                resources_to_add_ux.append(Resource(name="Portfolio Review Prep (Medium)", url="#placeholder_uxui_medium_portfolioreview", resource_type="Article", step_id=s10_2_ux.id))
-                resources_to_add_ux.append(Resource(name="UX Interview Questions (Toptal)", url="#placeholder_uxui_toptal_interview", resource_type="Article", step_id=s10_3_ux.id))
-                resources_to_add_ux.append(Resource(name="Whiteboard Challenge Guide (YT)", url="#placeholder_uxui_yt_whiteboard", resource_type="Video", step_id=s10_4_ux.id))
-
-                # --- Add all collected resources for UX/UI ---
-                if resources_to_add_ux:
-                    db.session.add_all(resources_to_add_ux)
-
-                db.session.commit() # Commit all additions for the UX/UI path
-                print(f"Path '{uxui_path.name}' seeded successfully.")
-
-            elif uxui_path:
-                 print(f"Path '{uxui_path.name}' milestones already seem to exist. Skipping seeding.")
-            else:
-                 print("UX/UI Design career path not found in DB, skipping seeding.")
-
-            # --- <<< END ADDED BLOCK FOR UX/UI SEEDING >>> ---
-
-
-            flash("Database initialization and seeding check complete.", 'info')
-            return redirect(url_for('home')) # Redirect home after completion
-
-    except Exception as e:
-        db.session.rollback() # Rollback on any error during the process
-        print(f"Error during DB initialization/seeding: {e}") # Log the specific error
-        flash(f"Error during DB initialization/seeding: {e}", 'danger')
-        return redirect(url_for('home')) # Redirect home even on error
 
 
 # --- Main execution ---
