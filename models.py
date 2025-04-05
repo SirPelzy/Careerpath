@@ -89,13 +89,19 @@ class Step(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    sequence = db.Column(db.Integer, nullable=False, default=0) # For ordering steps within a milestone
-    estimated_time_minutes = db.Column(db.Integer, nullable=True) # Optional time estimate
+    sequence = db.Column(db.Integer, nullable=False, default=0)
+    estimated_time_minutes = db.Column(db.Integer, nullable=True)
     milestone_id = db.Column(db.Integer, db.ForeignKey('milestones.id'), nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # --- << NEW FIELD >> ---
+    # Define types like: Learning, Project, Assessment, Reading, Video, Practice, Setup, Informational etc.
+    # Making it nullable=True is safer when adding to existing tables initially.
+    step_type = db.Column(db.String(50), nullable=True, index=True)
+    # --- << END NEW FIELD >> ---
+
+
     # Relationships
-    # Defines 'resources' collection on Step
     resources = db.relationship('Resource', backref='step', lazy='dynamic', cascade="all, delete-orphan")
     # user_statuses defined via backref in UserStepStatus
 
