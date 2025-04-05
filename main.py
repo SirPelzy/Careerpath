@@ -1,6 +1,7 @@
 import os
 import uuid
 import datetime
+from flask_migrate import Migrate
 from werkzeug.utils import secure_filename # To sanitize filenames
 from flask import Flask, render_template, redirect, url_for, flash, request, abort
 from flask_sqlalchemy import SQLAlchemy
@@ -8,7 +9,7 @@ from flask_wtf.csrf import CSRFProtect
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
 from dotenv import load_dotenv
-from flask_migrate import Migrate
+
 
 # Import Models
 from models import db, User, CareerPath, Milestone, Step, Resource, UserStepStatus, PortfolioItem
@@ -16,6 +17,13 @@ from models import db, User, CareerPath, Milestone, Step, Resource, UserStepStat
 # Import Forms (Make sure EditProfileForm and RecommendationTestForm are imported)
 from forms import RegistrationForm, LoginForm, OnboardingForm, PortfolioItemForm, EditProfileForm, RecommendationTestForm
 
+print("DEBUG: Importing Migrate...") # <-- Add Print
+try:
+    from flask_migrate import Migrate
+    print("DEBUG: Imported Migrate successfully.") # <-- Add Print
+except ImportError as e:
+    print(f"DEBUG: FAILED to import Migrate: {e}")
+    Migrate = None
 # Load environment variables from .env file
 load_dotenv()
 
@@ -38,16 +46,20 @@ login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 db.init_app(app) # Initialize SQLAlchemy with the app context
 
-print("DEBUG: Attempting to initialize Migrate...")
-try:
-    # Ensure Migrate is imported at the top: from flask_migrate import Migrate
-    migrate = Migrate(app, db)
-    print("DEBUG: Migrate initialized successfully.")
-except Exception as e:
-    print(f"DEBUG: ERROR initializing Migrate: {e}")
-    migrate = None # Prevent further errors if init fails
-
 migrate = Migrate(app, db) # Initialize Flask-Migrate
+
+# Initialize Migrate only if import succeeded
+migrate = None
+if Migrate:
+    print("DEBUG: Attempting to initialize Migrate...") # <-- Add Print
+    try:
+        migrate = Migrate(app, db)
+        print("DEBUG: Initialized Migrate successfully.") # <-- Add Print
+    except Exception as e:
+         print(f"DEBUG: ERROR initializing Migrate: {e}") # <-- Add Print
+         migrate = None # Prevent further errors if init fails
+else:
+    print("DEBUG: Skipping Migrate initialization due to import failure.") # <-- Add Print
 
 # --- Context Processor for Jinja ---
 @app.context_processor
