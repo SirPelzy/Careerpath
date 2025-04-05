@@ -21,6 +21,8 @@ load_dotenv()
 
 app = Flask(__name__)
 
+db.init_app(app)
+
 migrate = Migrate(app, db) # Initialize Flask-Migrate
 
 # --- Configuration ---
