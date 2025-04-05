@@ -21,6 +21,8 @@ load_dotenv()
 
 app = Flask(__name__)
 
+migrate = Migrate(app, db) # Initialize Flask-Migrate
+
 # --- Configuration ---
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secure-fallback-key-34567') # Use env var ideally
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
