@@ -82,11 +82,17 @@
                         {% if step.estimated_time_minutes %}
                           <small class="text-muted">Est. Time: {{ (step.estimated_time_minutes / 60)|round(1) if step.estimated_time_minutes >= 60 else step.estimated_time_minutes }} {{ 'hours' if step.estimated_time_minutes >= 60 else 'minutes' }}</small><br>
                         {% endif %}
+                        {# Resources for the step #}
                         {% if step.resources.count() > 0 %}
                           <small>Resources:</small>
                           <ul>
                             {% for resource in step.resources %}
                               <li>
+                                {# --- << NEW Recommendation Badge >> --- #}
+                                {% if resource.id in recommended_resource_ids %}
+                                  <span class="badge bg-warning text-dark me-1 align-middle" title="Recommended based on your profile"><i class="bi bi-star-fill"></i></span>
+                                {% endif %}
+                                {# --- << End Recommendation Badge >> --- #}
                                 <a href="{{ resource.url }}" target="_blank" rel="noopener noreferrer">
                                   {{ resource.name }} {% if resource.resource_type %}({{ resource.resource_type }}){% endif %}
                                 </a>
