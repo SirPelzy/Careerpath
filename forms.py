@@ -15,6 +15,7 @@ from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, SubmitField, SelectField, TextAreaField, URLField
 from wtforms.validators import DataRequired, Length, Optional, URL, ValidationError
+from wtforms import RadioField, SubmitField
 # Import PortfolioItem model if needed for validation (not strictly needed here)
 # from models import PortfolioItem
 
@@ -44,12 +45,6 @@ class LoginForm(FlaskForm):
     password = PasswordField('Password', validators=[DataRequired()])
     remember_me = BooleanField('Remember Me')
     submit = SubmitField('Login')
-
-# --- Onboarding Form (Placeholder - we'll define fields later) ---
-class OnboardingForm(FlaskForm):
-    """Form for collecting user details after registration."""
-    # Define fields like target_career_path, current_role, etc. later
-    submit = SubmitField('Save Profile')
 
 # --- Function to provide query for QuerySelectField ---
 def career_path_query():
@@ -231,4 +226,54 @@ class EditProfileForm(FlaskForm):
         ]
     )
     submit = SubmitField('Update Profile')
+
+
+class RecommendationTestForm(FlaskForm):
+    """Form for the revised career recommendation questionnaire."""
+
+    q1_hobby = RadioField(
+        'If you had a free afternoon to explore a tech-related topic, which sounds most engaging?',
+        choices=[
+            ('A', 'Digging into a large dataset (e.g., movie ratings, public transit data) to see what interesting patterns or stories you could uncover.'),
+            ('B', 'Sketching out different layouts and interactions for a mobile app idea to make it user-friendly.'),
+            ('C', 'Tinkering with code to build a small tool or understand how an existing program works internally.'),
+            ('D', 'Reading about recent cyber threats and thinking about how digital systems could be better protected.')
+        ],
+        validators=[DataRequired(message="Please select an answer.")]
+    )
+
+    q2_approach = RadioField(
+        "When tackling a complex challenge, what's your typical starting point?",
+        choices=[
+            ('A', 'First, gather and analyze all the available data and facts related to the problem.'),
+            ('B', 'First, try to understand the perspectives and needs of the people affected by the challenge.'),
+            ('C', 'First, break the challenge down into smaller, logical steps or components to build a solution.'),
+            ('D', 'First, identify the potential risks, weaknesses, or things that could go wrong.')
+        ],
+        validators=[DataRequired(message="Please select an answer.")]
+    )
+
+    q3_reward = RadioField(
+        'Which of these activities feels most satisfying or rewarding to you?',
+        choices=[
+            ('A', "Discovering a key insight or trend from information that wasn't obvious before."),
+            ('B', "Creating a smooth, intuitive, and visually appealing experience for someone else."),
+            ('C', 'Building something functional that works reliably and solves a specific task.'),
+            ('D', 'Finding and fixing a potential vulnerability or making a system more secure.')
+        ],
+        validators=[DataRequired(message="Please select an answer.")]
+    )
+
+    q4_feedback = RadioField(
+        'Imagine reviewing a newly launched website. What kind of feedback are you most likely to give first?',
+        choices=[
+            ('A', 'Comments on whether the data presented is clear, accurate, and easy to interpret.'),
+            ('B', 'Feedback on how easy it is to navigate, find information, and whether the layout feels right.'),
+            ('C', 'Thoughts on whether the site loads quickly, works correctly on different devices, or if any features seem broken.'),
+            ('D', 'Concerns about whether user data seems secure or if there are potential ways the site could be exploited.')
+        ],
+        validators=[DataRequired(message="Please select an answer.")]
+    )
+
+    submit = SubmitField('See My Recommendation')
 
