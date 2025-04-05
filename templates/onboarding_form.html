@@ -3,18 +3,15 @@
 {% block title %}Complete Your Profile - Careerpath!{% endblock %}
 
 {% block content %}
+{# --- Add NEW Fixed Back Link Here --- #}
+<a href="{{ url_for('onboarding') }}" class="btn btn-sm btn-outline-secondary back-link-fixed" title="Back to Start Choice">
+  <i class="bi bi-arrow-left-circle me-1"></i>Back
+</a>
+{# --- End Fixed Back Link --- #}
 <div class="row justify-content-center">
   <div class="col-md-8 col-lg-6">
     <h2>Complete Your Profile</h2>
     <p class="lead">Tell us a bit more about yourself so we can personalize your career path.</p>
-
-    {# --- Back Navigation Link --- #}
-    <div class="mb-4">
-      <a href="{{ url_for('onboarding') }}" class="text-decoration-none text-muted">
-        <i class="bi bi-arrow-left-circle me-1"></i>Back to Start Choice
-      </a>
-    </div>
-    {# --- End Back Navigation Link --- #}
 
     <form method="POST" action="" enctype="multipart/form-data" novalidate>
       {{ form.hidden_tag() }} <div class="mb-3">
