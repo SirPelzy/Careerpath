@@ -88,26 +88,39 @@
                           <ul>
                             {% for resource in step.resources %}
                               <li>
-                                {# --- << NEW Recommendation Badge >> --- #}
+                                {# Recommendation Badge #}
                                 {% if resource.id in recommended_resource_ids %}
                                   <span class="badge bg-warning text-dark me-1 align-middle" title="Recommended based on your profile"><i class="bi bi-star-fill"></i></span>
                                 {% endif %}
-                                {# --- << End Recommendation Badge >> --- #}
+                                {# End Recommendation Badge #}
                                 <a href="{{ resource.url }}" target="_blank" rel="noopener noreferrer">
                                   {{ resource.name }} {% if resource.resource_type %}({{ resource.resource_type }}){% endif %}
                                 </a>
                               </li>
                             {% endfor %}
                           </ul>
-                        {% if not step.id in completed_step_ids %} {# Maybe only allow adding proof if step isn't complete? Or allow anytime? Let's allow anytime for now #}
-                        <div class="mt-2">
-                            <a href="{{ url_for('add_portfolio_item', step_id=step.id) }}" class="btn btn-sm btn-outline-secondary py-0" title="Add proof or link for this step">
-                                <small><i class="bi bi-paperclip me-1"></i>Link/Upload Proof</small>
-                            </a>
-                        </div>
+                        {% endif %} {# End if step.resources #}
+
+                        {# --- Conditionally Add Proof Link --- #}
+                        {% set proof_keywords = ['project', 'build', 'showcase', 'certificate', 'assessment', 'complete', 'portfolio', 'internship'] %} {# Added internship #}
+                        {% set show_proof_link = False %}
+                        {% for keyword in proof_keywords %}
+                          {% if keyword in step.name|lower %}
+                            {% set show_proof_link = True %}
+                          {% endif %}
+                        {% endfor %}
+
+                        {% if show_proof_link %}
+                          <div class="mt-2">
+                              <a href="{{ url_for('add_portfolio_item', step_id=step.id) }}" class="btn btn-sm btn-outline-secondary py-0" title="Add proof or link for this step">
+                                  <small><i class="bi bi-paperclip me-1"></i>Link/Upload Proof</small>
+                              </a>
+                          </div>
                         {% endif %}
-                      </div>
-                                  
+                        {# --- End Conditional Add Proof Link --- #}
+
+                      </div> {# End Step Details Div #}
+
                       {# Step Completion Status/Button #}
                       <span class="badge bg-light text-dark ms-2 align-self-center">
                         {% if step.id in completed_step_ids %}
