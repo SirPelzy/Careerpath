@@ -662,6 +662,96 @@ def profile():
                            is_homepage=False) # Use sidebar navigation
 
 
+# --- Recommendation Test Route ---
+@app.route('/recommendation-test', methods=['GET', 'POST'])
+@login_required
+def recommendation_test():
+    """Displays and processes the career recommendation test."""
+    form = RecommendationTestForm()
+    if form.validate_on_submit():
+        # --- Basic Rule-Based Scoring ---
+        scores = {"Data Analysis / Analytics": 0, "UX/UI Design": 0, "Software Engineering": 0, "Cybersecurity": 0}
+        answers = {
+            'q1': form.q1_hobby.data,
+            'q2': form.q2_approach.data,
+            'q3': form.q3_reward.data,
+            'q4': form.q4_feedback.data
+        }
+
+        # Q1 Scoring
+        if answers['q1'] == 'A': scores["Data Analysis / Analytics"] += 1
+        elif answers['q1'] == 'B': scores["UX/UI Design"] += 1
+        elif answers['q1'] == 'C': scores["Software Engineering"] += 1 # For future
+        elif answers['q1'] == 'D': scores["Cybersecurity"] += 1      # For future
+
+        # Q2 Scoring
+        if answers['q2'] == 'A': scores["Data Analysis / Analytics"] += 1
+        elif answers['q2'] == 'B': scores["UX/UI Design"] += 1
+        elif answers['q2'] == 'C': scores["Software Engineering"] += 1
+        elif answers['q2'] == 'D': scores["Cybersecurity"] += 1
+
+        # Q3 Scoring
+        if answers['q3'] == 'A': scores["Data Analysis / Analytics"] += 1
+        elif answers['q3'] == 'B': scores["UX/UI Design"] += 1
+        elif answers['q3'] == 'C': scores["Software Engineering"] += 1
+        elif answers['q3'] == 'D': scores["Cybersecurity"] += 1
+
+        # Q4 Scoring
+        if answers['q4'] == 'A': scores["Data Analysis / Analytics"] += 1
+        elif answers['q4'] == 'B': scores["UX/UI Design"] += 1
+        elif answers['q4'] == 'C': scores["Software Engineering"] += 1
+        elif answers['q4'] == 'D': scores["Cybersecurity"] += 1
+
+        # Determine highest score (simple version - ignores ties for now)
+        # Filter out paths we haven't seeded yet for recommendation
+        available_paths = {"Data Analysis / Analytics", "UX/UI Design"} # Add more as seeded
+        filtered_scores = {path: score for path, score in scores.items() if path in available_paths}
+
+        if not filtered_scores:
+             # Handle case where no available path got points (e.g., user chose only C/D)
+             recommended_path_name = "Data Analysis / Analytics" # Default recommendation
+        else:
+             recommended_path_name = max(filtered_scores, key=filtered_scores.get)
+
+        # Find the corresponding CareerPath object ID
+        recommended_path = CareerPath.query.filter_by(name=recommended_path_name).first()
+
+        if recommended_path:
+            # Redirect to results page, passing recommendation info
+            return redirect(url_for('recommendation_results',
+                                    recommended_path_id=recommended_path.id,
+                                    recommended_path_name=recommended_path.name))
+        else:
+            # Path not found in DB (shouldn't happen if seeded)
+            flash('Could not process recommendation. Please select a path manually.', 'warning')
+            return redirect(url_for('onboarding_form'))
+
+    # Render the test form on GET request or if POST validation fails
+    return render_template('recommendation_test.html',
+                           title="Career Recommendation Test",
+                           form=form,
+                           is_homepage=False) # Use sidebar layout
+
+# --- Recommendation Results Route ---
+@app.route('/recommendation-results') # GET only
+@login_required
+def recommendation_results():
+    """Displays the recommendation results and next steps."""
+    recommended_path_id = request.args.get('recommended_path_id', type=int)
+    recommended_path_name = request.args.get('recommended_path_name')
+
+    if not recommended_path_id or not recommended_path_name:
+        # If parameters are missing, redirect back to test or choice
+        flash('Recommendation results not found. Please try the test again.', 'warning')
+        return redirect(url_for('recommendation_test'))
+
+    return render_template('recommendation_results.html',
+                            title="Your Recommendation",
+                            recommended_path_id=recommended_path_id,
+                            recommended_path_name=recommended_path_name,
+                            is_homepage=False) # Use sidebar layout
+
+
 # --- Main execution ---
 if __name__ == '__main__':
     # Ensure the main upload folder exists
