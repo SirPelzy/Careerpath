@@ -10,3 +10,4 @@ Werkzeug>=2.0.0         # Ensure compatibility
 Jinja2>=3.0.0
 gunicorn
 WTForms-SQLAlchemy>=0.3
+Flask-Migrate>=4.0.0
