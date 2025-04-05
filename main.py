@@ -21,8 +21,6 @@ load_dotenv()
 
 app = Flask(__name__)
 
-db.init_app(app)
-
 # --- Configuration ---
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secure-fallback-key-34567') # Use env var ideally
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
@@ -32,8 +30,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 # 10 MB limit for uploads
 
-migrate = Migrate(app, db) # Initialize Flask-Migrate
-
 # --- Initialize Extensions ---
 csrf = CSRFProtect(app)
 bcrypt = Bcrypt(app)
@@ -41,6 +37,8 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
 db.init_app(app) # Initialize SQLAlchemy with the app context
+
+migrate = Migrate(app, db) # Initialize Flask-Migrate
 
 # --- Context Processor for Jinja ---
 @app.context_processor
