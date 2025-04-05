@@ -8,6 +8,7 @@ from flask_wtf.csrf import CSRFProtect
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
 from dotenv import load_dotenv
+from flask_migrate import Migrate
 
 # Import Models
 from models import db, User, CareerPath, Milestone, Step, Resource, UserStepStatus, PortfolioItem
