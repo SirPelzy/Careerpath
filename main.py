@@ -285,65 +285,110 @@ def logout():
     flash('You have been logged out.', 'success')
     return redirect(url_for('home'))
 
-# --- Onboarding Route Implementation ---
-@app.route('/onboarding', methods=['GET', 'POST'])
+# --- Onboarding Choice Route ---
+@app.route('/onboarding') # Removed methods=['GET', 'POST'] for now
 @login_required
 def onboarding():
+    # Redirect if user already completed onboarding
+    if current_user.onboarding_complete:
+         return redirect(url_for('dashboard'))
+
+    # Show the initial choice page
+    return render_template('onboarding_choice.html', title='Choose Your Start', is_homepage=False) # Use sidebar layout
+
+# --- Onboarding Form Route (Handles actual form) ---
+@app.route('/onboarding/form', methods=['GET', 'POST'])
+@login_required
+def onboarding_form():
+    # Redirect if user already completed onboarding
     if current_user.onboarding_complete:
          return redirect(url_for('dashboard'))
 
     form = OnboardingForm()
 
+    # Pre-select path if recommended via query parameter (from recommendation results)
+    if request.method == 'GET':
+        recommended_path_id = request.args.get('recommended_path_id', type=int)
+        if recommended_path_id:
+            recommended_path = CareerPath.query.get(recommended_path_id)
+            if recommended_path:
+                form.target_career_path.data = recommended_path
+            else:
+                flash('Invalid recommendation ID provided.', 'warning')
+        # Pre-populate other fields if needed (though usually done after recommendation accepts)
+        # elif current_user.target_career_path: # Or pre-fill if they started before
+        #    form.target_career_path.data = current_user.target_career_path
+
+
     if form.validate_on_submit():
         try:
-            # Handle CV Upload
-            cv_filename_to_save = current_user.cv_filename # Keep existing if not uploading new
+            # --- Handle CV Upload ---
+            cv_filename_to_save = current_user.cv_filename
             if form.cv_upload.data:
+                # ... (Keep existing CV upload logic: secure_filename, unique name, save, delete old) ...
                 file = form.cv_upload.data
                 base_filename = secure_filename(file.filename)
                 unique_id = uuid.uuid4().hex
                 name, ext = os.path.splitext(base_filename)
                 ext = ext.lower()
-                name = name[:100] # Limit base name length
+                name = name[:100]
                 cv_filename_to_save = f"user_{current_user.id}_{unique_id}{ext}"
-                # Save to main upload folder
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], cv_filename_to_save)
-
-                # Optional: Delete old CV file
                 if current_user.cv_filename and current_user.cv_filename != cv_filename_to_save:
                    old_path = os.path.join(app.config['UPLOAD_FOLDER'], current_user.cv_filename)
                    if os.path.exists(old_path):
-                       try:
-                           os.remove(old_path)
-                           print(f"Removed old CV: {old_path}")
-                       except OSError as e:
-                           print(f"Error removing old CV {old_path}: {e}")
-
-                # Save the new file
+                       try: os.remove(old_path)
+                       except OSError as e: print(f"Error removing old CV {old_path}: {e}")
                 file.save(file_path)
                 print(f"CV saved to: {file_path}")
 
-            # Update user object
+            # --- Update User Object ---
             current_user.target_career_path = form.target_career_path.data
             current_user.current_role = form.current_role.data
             current_user.employment_status = form.employment_status.data
             current_user.time_commitment = form.time_commitment.data
             current_user.interests = form.interests.data
             current_user.learning_style = form.learning_style.data if form.learning_style.data else None
-            current_user.cv_filename = cv_filename_to_save # Update with new or keep old
-
-            current_user.onboarding_complete = True
+            current_user.cv_filename = cv_filename_to_save
+            current_user.onboarding_complete = True # Mark complete now
 
             db.session.commit()
-            flash('Your profile has been updated successfully!', 'success')
+            flash('Your profile is set up! Welcome to your dashboard.', 'success')
             return redirect(url_for('dashboard'))
 
         except Exception as e:
              db.session.rollback()
-             print(f"Error during onboarding save: {e}")
+             print(f"Error during onboarding form save: {e}")
              flash('An error occurred while saving your profile. Please try again.', 'danger')
 
-    return render_template('onboarding.html', title='Complete Your Profile', form=form, is_homepage=False) # Use sidebar
+    # Render the actual form template (the renamed file)
+    return render_template('onboarding_form.html',
+                           title='Complete Your Profile',
+                           form=form,
+                           is_homepage=False) # Use sidebar layout
+
+# --- Placeholder Recommendation Test Routes ---
+@app.route('/recommendation-test', methods=['GET', 'POST'])
+@login_required
+def recommendation_test():
+    # Logic for test form will go here
+    # For now, just show a placeholder
+    flash("Recommendation test coming soon!", "info")
+    return render_template('placeholder_page.html', title="Recommendation Test", is_homepage=False) # Create this template
+
+@app.route('/recommendation-results') # Typically GET after test POST redirects here
+@login_required
+def recommendation_results():
+    # Logic to display results and options will go here
+    # For now, just show a placeholder
+    # Example: Pass a dummy recommendation
+    recommended_path = CareerPath.query.first() # Just grabbing the first path as dummy data
+    flash("Recommendation results page coming soon!", "info")
+    return render_template('placeholder_page.html',
+                            title="Recommendation Results",
+                            recommended_path=recommended_path, # Dummy data
+                            is_homepage=False)
+
 
 # --- Route to Toggle Step Completion Status ---
 @app.route('/path/step/<int:step_id>/toggle', methods=['POST'])
