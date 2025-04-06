@@ -76,6 +76,35 @@ def home():
     # Pass is_homepage=True for the homepage
     return render_template('home.html', is_homepage=True)
 
+# --- NEW Email Verification Route ---
+@app.route('/verify-email/<token>')
+def verify_token(token):
+    """Handles email verification via token link."""
+    if current_user.is_authenticated and current_user.email_verified:
+        flash('Account already verified.', 'info')
+        return redirect(url_for('dashboard')) # Already verified and logged in
+
+    user = User.verify_email_token(token) # Use the static method
+
+    if user:
+        if user.email_verified:
+            flash('Account already verified. Please log in.', 'info')
+        else:
+            try:
+                user.email_verified = True
+                db.session.commit()
+                flash('Your email has been verified successfully! You can now log in.', 'success')
+            except Exception as e:
+                 db.session.rollback()
+                 print(f"Error marking email verified for user {user.id}: {e}")
+                 flash('An error occurred during verification. Please try again or contact support.', 'danger')
+                 return redirect(url_for('home')) # Redirect home on error
+        return redirect(url_for('login')) # Redirect to login after success or if already verified
+    else:
+        flash('The email verification link is invalid or has expired.', 'warning')
+        # Redirect somewhere sensible, maybe home or register?
+        return redirect(url_for('home'))
+
 # --- Combined Dashboard Route with Resource Personalization ---
 @app.route('/dashboard')
 @login_required
