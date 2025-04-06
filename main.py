@@ -801,6 +801,38 @@ def delete_portfolio_item(item_id):
 
     return redirect(url_for('portfolio'))
 
+# --- NEW Portfolio File Download Route ---
+@app.route('/portfolio/download/<int:item_id>')
+@login_required
+def download_portfolio_file(item_id):
+    """Provides download access to an uploaded portfolio file, checking ownership."""
+    item = PortfolioItem.query.get_or_404(item_id)
+
+    # 1. Check Ownership
+    if item.user_id != current_user.id:
+        abort(403) # Forbidden
+
+    # 2. Check if a file is actually associated
+    if not item.file_filename:
+        flash("No downloadable file associated with this portfolio item.", "warning")
+        return redirect(url_for('portfolio')) # Or maybe item detail page if you create one
+
+    # 3. Construct the path to the file
+    # Ensure this path construction matches where files are SAVED
+    # (Uses the get_portfolio_upload_path helper's logic implicitly)
+    portfolio_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'portfolio')
+    filename = item.file_filename
+
+    # 4. Use send_from_directory for security (prevents path traversal)
+    try:
+        return send_from_directory(portfolio_dir, filename, as_attachment=True)
+        # as_attachment=True prompts browser to download instead of displaying
+    except FileNotFoundError:
+        abort(404) # File record exists but file is missing on server
+    except Exception as e:
+        print(f"Error sending portfolio file {filename}: {e}")
+        abort(500)
+
 
 # --- Profile Route ---
 @app.route('/profile', methods=['GET', 'POST'])
