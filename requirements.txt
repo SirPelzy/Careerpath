@@ -13,3 +13,4 @@ gunicorn
 WTForms-SQLAlchemy>=0.3
 SQLAlchemy>=2.0.0 # Ensure SQLAlchemy is also listed
 Click>=8.1.0 # Flask depends on this
+itsdangerous>=2.0.0
