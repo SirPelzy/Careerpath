@@ -3,7 +3,7 @@ import uuid
 import datetime
 from flask_migrate import Migrate
 from werkzeug.utils import secure_filename # To sanitize filenames
-from flask import Flask, render_template, redirect, url_for, flash, request, abort, current_app
+from flask import Flask, render_template, redirect, url_for, flash, request, abort, current_app, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from flask_bcrypt import Bcrypt
@@ -280,6 +280,10 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     form = LoginForm()
+    # --- Check for reset modal info from session on GET request ---
+    show_modal = session.pop('show_reset_modal', False) # Get value and remove from session
+    reset_url = session.pop('reset_url', None) # Get value and remove from session
+    # --- End Check ---
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data.lower()).first()
         if user and user.check_password(form.password.data):
@@ -301,7 +305,7 @@ def login():
                  return redirect(next_page or url_for('dashboard'))
         else:
             flash('Login Unsuccessful. Please check email and password.', 'danger')
-    return render_template('login.html', title='Login', form=form, is_homepage=True)
+    return render_template('login.html', title='Login', form=form, is_homepage=True, show_reset_modal=show_modal, reset_url=reset_url)
 
 @app.route('/logout')
 @login_required
@@ -818,21 +822,24 @@ def profile():
 def request_reset():
     """Route for requesting a password reset."""
     if current_user.is_authenticated:
-        return redirect(url_for('home')) # Or dashboard
+        return redirect(url_for('home'))
     form = RequestResetForm()
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data.lower()).first()
+        # --- MODIFIED Logic ---
+        reset_url_for_dev = None # Variable to potentially store URL for session
         if user:
-            # Generate Token (using user ID)
+            # Generate Token
             s = Serializer(current_app.config['SECRET_KEY'])
-            token_salt = 'password-reset-salt' # Use a salt specific to this process
+            token_salt = 'password-reset-salt'
             token = s.dumps(user.id, salt=token_salt)
-            reset_url = url_for('reset_token', token=token, _external=True)
+            reset_url = url_for('reset_token', token=token, _external=True) # Generate full URL
 
-            # --- !!! DEVELOPMENT ONLY: Display link instead of emailing !!! ---
-            print(f"DEBUG: Password Reset URL for {user.email}: {reset_url}") # Print to console
-            flash(f'DEV MODE: If an account exists for {form.email.data}, a reset link would be sent. For testing, use this link: {reset_url}', 'info')
-            # --- !!! END DEVELOPMENT ONLY --- !!!
+            # Store URL in session for DEV MODE pop-up
+            reset_url_for_dev = reset_url
+            session['show_reset_modal'] = True
+            session['reset_url'] = reset_url_for_dev
+            print(f"DEBUG: Stored reset URL in session for {user.email}") # Optional debug print
 
             # --- !!! PRODUCTION: Send Email (Requires Flask-Mail setup) !!! ---
             # msg = Message('Password Reset Request',
