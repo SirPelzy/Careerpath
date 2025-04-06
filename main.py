@@ -267,8 +267,30 @@ def register():
             user.set_password(form.password.data)
             db.session.add(user)
             db.session.commit()
-            flash('Your account has been created! Please log in.', 'success')
+
+            try:
+                s = Serializer(current_app.config['SECRET_KEY'])
+                token_salt = 'email-confirm-salt' # Different salt
+                token = s.dumps(user.id, salt=token_salt)
+                verify_url = url_for('verify_token', token=token, _external=True)
+
+                # Store in session for DEV MODE modal
+                session['show_verify_modal'] = True
+                session['verify_url'] = verify_url
+                print(f"DEBUG: Stored verify URL in session for {user.email}")
+
+                # Flash message indicating verification needed (and showing link for dev)
+                flash('Your account has been created! Please check the pop-up on the login page to verify your email (DEV MODE).', 'success')
+
+                # --- PRODUCTION Email code would go here ---
+                # msg = Message(...) send email with verify_url ...
+                # --- End Production ---
+            except Exception as e_token:
+                 # Log error if token generation fails, but let user log in
+                 print(f"Error generating verification token for {user.email}: {e_token}")
+                 flash('Your account was created, but verification link generation failed. Please contact support or try resetting password later.', 'warning')
             return redirect(url_for('login'))
+            
         except Exception as e:
             db.session.rollback()
             print(f"Error during registration: {e}")
