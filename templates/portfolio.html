@@ -44,7 +44,9 @@
           <a href="{{ item.link_url }}" class="btn btn-sm btn-outline-info me-2" target="_blank" rel="noopener noreferrer">View Link</a>
         {% endif %}
         {% if item.file_filename %}
-          <span class="badge bg-secondary me-2">File: {{ item.file_filename }}</span>
+          <a href="{{ url_for('download_portfolio_file', item_id=item.id) }}" class="btn btn-sm btn-outline-success me-2" title="Download {{ item.file_filename }}">
+            <i class="bi bi-download me-1"></i>Download File
+          </a>
           {# TODO: Add download link later #}
         {% endif %}
       </div>
