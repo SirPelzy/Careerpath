@@ -47,13 +47,24 @@
               <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ milestone.id }}" aria-expanded="false" aria-controls="collapse{{ milestone.id }}">
                 <div class="w-100 d-flex justify-content-between align-items-center pe-3">
                   <span>Milestone {{ loop.index }}: {{ milestone.name }}</span>
-                  {# Milestone Progress Text #}
+                  {# --- MODIFIED Milestone Progress Display --- #}
                   {% set progress = milestone_progress.get(milestone.id) %}
                   {% if progress and progress.total > 0 %}
-                    <span class="badge bg-light text-dark ms-2">
-                      {{ progress.completed }} / {{ progress.total }} Done ({{ progress.percent }}%)
-                    </span>
+                    {# Check if completed == total #}
+                    {% if progress.completed == progress.total %}
+                      <span class="badge bg-success ms-2"> {# Use Bootstrap success badge #}
+                        <i class="bi bi-check-circle-fill me-1"></i>Completed
+                      </span>
+                    {% else %}
+                      {# Show progress text only if not fully complete #}
+                      <span class="badge bg-light text-dark ms-2">
+                        {{ progress.completed }} / {{ progress.total }} Done ({{ progress.percent }}%)
+                      </span>
+                    {% endif %}
+                  {% elif progress %} {# Case where total steps is 0 #}
+                     <span class="badge bg-light text-dark ms-2">0 / 0 Done</span>
                   {% endif %}
+                  {# --- End MODIFIED Display --- #}
                 </div>
               </button>
             </h2>
