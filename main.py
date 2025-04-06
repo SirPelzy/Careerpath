@@ -444,106 +444,91 @@ def recommendation_test():
     """Displays and processes the career recommendation test."""
     form = RecommendationTestForm()
     if form.validate_on_submit():
-        # --- Basic Rule-Based Scoring ---
-        # Initialize scores for all potential paths
-        scores = {
-            "Data Analysis / Analytics": 0,
-            "UX/UI Design": 0,
-            "Software Engineering": 0,
-            "Cybersecurity": 0
-        }
-        answers = {
-            'q1': form.q1_hobby.data,
-            'q2': form.q2_approach.data,
-            'q3': form.q3_reward.data,
-            'q4': form.q4_feedback.data
-        }
-
-        # Apply scoring based on answers (Adjust scores/logic as needed)
-        # Q1: Hobby Preference
+        # --- Scoring Logic (as before) ---
+        scores = {"Data Analysis / Analytics": 0, "UX/UI Design": 0, "Software Engineering": 0, "Cybersecurity": 0}
+        answers = { 'q1': form.q1_hobby.data, 'q2': form.q2_approach.data, 'q3': form.q3_reward.data, 'q4': form.q4_feedback.data }
+        # Q1
         if answers['q1'] == 'A': scores["Data Analysis / Analytics"] += 1
         elif answers['q1'] == 'B': scores["UX/UI Design"] += 1
         elif answers['q1'] == 'C': scores["Software Engineering"] += 1
         elif answers['q1'] == 'D': scores["Cybersecurity"] += 1
-
-        # Q2: Problem Approach
+        # Q2
         if answers['q2'] == 'A': scores["Data Analysis / Analytics"] += 1
         elif answers['q2'] == 'B': scores["UX/UI Design"] += 1
         elif answers['q2'] == 'C': scores["Software Engineering"] += 1
         elif answers['q2'] == 'D': scores["Cybersecurity"] += 1
-
-        # Q3: Rewarding Activity
+        # Q3
         if answers['q3'] == 'A': scores["Data Analysis / Analytics"] += 1
         elif answers['q3'] == 'B': scores["UX/UI Design"] += 1
         elif answers['q3'] == 'C': scores["Software Engineering"] += 1
         elif answers['q3'] == 'D': scores["Cybersecurity"] += 1
-
-        # Q4: Feedback Focus
+        # Q4
         if answers['q4'] == 'A': scores["Data Analysis / Analytics"] += 1
         elif answers['q4'] == 'B': scores["UX/UI Design"] += 1
         elif answers['q4'] == 'C': scores["Software Engineering"] += 1
         elif answers['q4'] == 'D': scores["Cybersecurity"] += 1
 
-        # Determine highest score among *available* paths
-        # Make sure these names exactly match the names seeded in the CareerPath table
-        available_paths = {"Data Analysis / Analytics", "UX/UI Design", "Cybersecurity", "Software Engineering"}
+        # --- Determine Recommendation(s) & Store in Session ---
+        available_paths = {"Data Analysis / Analytics", "UX/UI Design", "Cybersecurity", "Software Engineering"} # Update as paths are fully seeded
         filtered_scores = {path: score for path, score in scores.items() if path in available_paths and score > 0}
 
-        recommended_path_name = None
+        recommended_paths_info = [] # List to store tuples of (id, name)
+
         if not filtered_scores:
-             # Default recommendation if no path scored > 0
-             recommended_path_name = "Data Analysis / Analytics"
-             flash("Your answers didn't strongly match a specific path, suggesting Data Analysis as a starting point.", "info")
+            # Default recommendation if no path scored > 0
+            default_path = CareerPath.query.filter_by(name="Data Analysis / Analytics").first()
+            if default_path:
+                recommended_paths_info.append({'id': default_path.id, 'name': default_path.name})
+            flash("Your answers didn't strongly match a specific path, suggesting Data Analysis as a starting point.", "info")
         else:
-             # Find the path name with the highest score
-             recommended_path_name = max(filtered_scores, key=filtered_scores.get)
-             # Optional: Handle ties here if desired (e.g., recommend multiple or use a tie-breaker rule)
-             max_score = filtered_scores[recommended_path_name]
-             tied_paths = [path for path, score in filtered_scores.items() if score == max_score]
-             if len(tied_paths) > 1:
-                  flash(f"You showed strong interest in multiple areas ({', '.join(tied_paths)})! We're recommending {recommended_path_name} to start.", "info")
+            max_score = max(filtered_scores.values())
+            # Find all paths that have the max score
+            top_paths_names = [path for path, score in filtered_scores.items() if score == max_score]
 
+            # Get IDs for the top paths
+            top_paths = CareerPath.query.filter(CareerPath.name.in_(top_paths_names)).all()
+            recommended_paths_info = [{'id': p.id, 'name': p.name} for p in top_paths]
 
-        # Find the corresponding CareerPath object ID in the database
-        recommended_path = CareerPath.query.filter_by(name=recommended_path_name).first()
+            if len(recommended_paths_info) > 1:
+                 flash(f"You showed strong interest in multiple areas! Explore the recommendations below.", "info")
+            elif not recommended_paths_info:
+                 # Fallback if names didn't match DB (shouldn't happen)
+                 flash("Could not determine recommendation. Please select a path manually.", "warning")
+                 return redirect(url_for('onboarding_form'))
 
-        if recommended_path:
-            # Redirect to results page, passing recommendation info
-            return redirect(url_for('recommendation_results',
-                                    recommended_path_id=recommended_path.id,
-                                    recommended_path_name=recommended_path.name))
-        else:
-            # This should only happen if the recommended path name isn't in the DB (seeding error)
-            flash(f'Could not process recommendation (path "{recommended_path_name}" not found in database). Please select a path manually.', 'danger')
-            return redirect(url_for('onboarding_form'))
+        # Store the list of recommended path dictionaries in the session
+        session['recommended_paths'] = recommended_paths_info
 
-    # Render the test form on GET request or if POST validation fails
+        return redirect(url_for('recommendation_results'))
+        # --- End Recommendation Logic ---
+
+    # Render the test form on GET or if validation fails
     return render_template('recommendation_test.html',
                            title="Career Recommendation Test",
                            form=form,
-                           is_homepage=False) # Use sidebar layout
+                           is_homepage=False)
 
 # --- Recommendation Results Route ---
-@app.route('/recommendation-results') # GET only is appropriate here
+@app.route('/recommendation-results') # GET only
 @login_required
 def recommendation_results():
     """Displays the recommendation results and next steps."""
-    # Retrieve the recommended path details passed via query parameters
-    recommended_path_id = request.args.get('recommended_path_id', type=int)
-    recommended_path_name = request.args.get('recommended_path_name')
+    # Retrieve list of recommended paths from session
+    recommended_paths_info = session.pop('recommended_paths', None) # Use pop to clear after read
 
-    # Basic check if the necessary parameters were passed
-    if not recommended_path_id or not recommended_path_name:
-        flash('Recommendation results not found or invalid. Please try the test again.', 'warning')
-        # Redirect back to the test page if data is missing
+    if not recommended_paths_info:
+        # If data is missing from session, redirect back to test
+        flash('Recommendation results not found or expired. Please try the test again.', 'warning')
         return redirect(url_for('recommendation_test'))
 
-    # Render the results template, passing the recommendation details
+    # Determine if single or multiple recommendations
+    is_multiple = len(recommended_paths_info) > 1
+
     return render_template('recommendation_results.html',
                             title="Your Recommendation",
-                            recommended_path_id=recommended_path_id,
-                            recommended_path_name=recommended_path_name,
-                            is_homepage=False) # Use sidebar layout
+                            recommended_paths=recommended_paths_info, # Pass the list
+                            is_multiple=is_multiple, # Pass flag for template logic
+                            is_homepage=False)
 
 # --- Route to Toggle Step Completion Status ---
 @app.route('/path/step/<int:step_id>/toggle', methods=['POST'])
