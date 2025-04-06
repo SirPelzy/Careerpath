@@ -305,6 +305,8 @@ def login():
     # --- Check for reset modal info from session on GET request ---
     show_modal = session.pop('show_reset_modal', False) # Get value and remove from session
     reset_url = session.pop('reset_url', None) # Get value and remove from session
+    show_verify_modal = session.pop('show_verify_modal', False) # <-- New Check
+    verify_url = session.pop('verify_url', None)
     # --- End Check ---
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data.lower()).first()
@@ -327,7 +329,7 @@ def login():
                  return redirect(next_page or url_for('dashboard'))
         else:
             flash('Login Unsuccessful. Please check email and password.', 'danger')
-    return render_template('login.html', title='Login', form=form, is_homepage=True, show_reset_modal=show_modal, reset_url=reset_url)
+    return render_template('login.html', title='Login', form=form, is_homepage=True, show_reset_modal=show_modal, reset_url=reset_url, show_verify_modal=show_verify_modal, verify_url=verify_url)
 
 @app.route('/logout')
 @login_required
