@@ -491,6 +491,57 @@ def recommendation_results():
                             recommended_path_name=recommended_path_name,
                             is_homepage=False) # Use sidebar layout
 
+# --- Route to Toggle Step Completion Status ---
+@app.route('/path/step/<int:step_id>/toggle', methods=['POST'])
+@login_required
+def toggle_step_status(step_id):
+    """Marks a step as complete or incomplete for the current user."""
+    # Find the step or return 404 Not Found
+    step = Step.query.get_or_404(step_id)
+
+    # Optional: Check if the step actually belongs to the user's current path
+    # This adds complexity but prevents users potentially toggling steps from other paths
+    # if not step.milestone or step.milestone.career_path_id != current_user.target_career_path_id:
+    #     flash("Cannot modify status for a step not in your current path.", "warning")
+    #     return redirect(url_for('dashboard'))
+
+    # Find existing status record for this user and step, or None
+    user_status = UserStepStatus.query.filter_by(user_id=current_user.id, step_id=step.id).first()
+
+    try:
+        if user_status:
+            # If a status record exists, toggle it
+            if user_status.status == 'completed':
+                user_status.status = 'not_started'
+                user_status.completed_at = None # Clear completion time
+                flash(f'Step "{step.name}" marked as not started.', 'info')
+            else:
+                user_status.status = 'completed'
+                user_status.completed_at = datetime.datetime.utcnow() # Set completion time
+                flash(f'Step "{step.name}" marked as completed!', 'success')
+        else:
+            # If no status record exists, create a new one and mark it completed
+            user_status = UserStepStatus(
+                user_id=current_user.id,
+                step_id=step.id,
+                status='completed',
+                completed_at=datetime.datetime.utcnow()
+            )
+            db.session.add(user_status)
+            flash(f'Step "{step.name}" marked as completed!', 'success')
+
+        # Commit the change (either update or add)
+        db.session.commit()
+
+    except Exception as e:
+        # Rollback in case of database error
+        db.session.rollback()
+        print(f"Error updating step status for user {current_user.id}, step {step_id}: {e}")
+        flash('An error occurred while updating step status.', 'danger')
+
+    # Redirect back to the dashboard after processing
+    return redirect(url_for('dashboard'))
+
 # --- Portfolio Routes ---
 
 # Utility function to get portfolio upload path
