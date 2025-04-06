@@ -1,7 +1,7 @@
 # forms.py
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
-from wtforms import StringField, SubmitField, SelectField, TextAreaField
+from wtforms import StringField, SubmitField, SelectField, TextAreaField, EmailField
 from wtforms.validators import DataRequired, Length, Optional
 from wtforms_sqlalchemy.fields import QuerySelectField
 from models import User, CareerPath
@@ -276,4 +276,28 @@ class RecommendationTestForm(FlaskForm):
     )
 
     submit = SubmitField('See My Recommendation')
+
+# --- New Password Reset Forms ---
+
+class RequestResetForm(FlaskForm):
+    """Form for requesting a password reset email."""
+    email = EmailField('Enter Your Account Email',
+                       validators=[DataRequired(), Email()])
+    submit = SubmitField('Request Password Reset')
+
+    # Optional: Validate if the email exists in the database
+    # def validate_email(self, email):
+    #     user = User.query.filter_by(email=email.data.lower()).first()
+    #     if user is None:
+    #         # Don't reveal if email exists - show generic message either way
+    #         # We handle this logic in the route instead for clarity
+    #         pass
+
+class ResetPasswordForm(FlaskForm):
+    """Form for entering a new password."""
+    password = PasswordField('New Password', validators=[DataRequired(), Length(min=6)])
+    confirm_password = PasswordField('Confirm New Password',
+                                     validators=[DataRequired(), EqualTo('password', message='Passwords must match.')])
+    submit = SubmitField('Reset Password')
+
 
