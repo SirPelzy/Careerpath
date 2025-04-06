@@ -12,16 +12,15 @@ class User(UserMixin, db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
-    # Ensure password hash length is sufficient (e.g., 255)
     password_hash = db.Column(db.String(255), nullable=False)
-    first_name = db.Column(db.String(50), nullable=True) # Allow null initially
-    last_name = db.Column(db.String(50), nullable=True) # Allow null initially
+    first_name = db.Column(db.String(50), nullable=True)
+    last_name = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
 
     # Onboarding / Profile Fields
     current_role = db.Column(db.String(100), nullable=True)
-    target_career_path_id = db.Column(db.Integer, db.ForeignKey('career_paths.id'), nullable=True, index=True) # Added index
+    target_career_path_id = db.Column(db.Integer, db.ForeignKey('career_paths.id'), nullable=True, index=True)
     interests = db.Column(db.Text, nullable=True)
     employment_status = db.Column(db.String(50), nullable=True)
     time_commitment = db.Column(db.String(50), nullable=True)
@@ -31,7 +30,8 @@ class User(UserMixin, db.Model):
 
     # Relationships
     target_career_path = db.relationship('CareerPath', backref='users_targeting')
-    # step_statuses relationship is defined via backref in UserStepStatus
+    # step_statuses relationship defined via backref in UserStepStatus
+    # portfolio_items relationship defined via backref in PortfolioItem
 
     def set_password(self, password):
         """Hashes the password and stores it."""
@@ -54,12 +54,12 @@ class CareerPath(db.Model):
     description = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Relationship defined via backref in Milestone model
+    # Relationship 'milestones' defined via backref in Milestone model
 
     def __repr__(self):
         return f'<CareerPath {self.name}>'
 
-# --- New Models for Path Structure ---
+# --- Models for Path Structure ---
 
 class Milestone(db.Model):
     """Represents a major stage or module within a CareerPath."""
@@ -68,15 +68,18 @@ class Milestone(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    sequence = db.Column(db.Integer, nullable=False, default=0) # For ordering milestones within a path
+    sequence = db.Column(db.Integer, nullable=False, default=0)
     career_path_id = db.Column(db.Integer, db.ForeignKey('career_paths.id'), nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
-    # Defines 'milestones' collection on CareerPath, ordered by sequence
     career_path = db.relationship('CareerPath', backref=db.backref('milestones', lazy='dynamic', order_by='Milestone.sequence'))
-    # Defines 'steps' collection on Milestone, ordered by sequence
-    steps = db.relationship('Step', backref='milestone', lazy='dynamic', order_by='Step.sequence', cascade="all, delete-orphan")
+
+    # --- MODIFIED HERE: Removed lazy='dynamic' ---
+    steps = db.relationship('Step', backref='milestone', order_by='Step.sequence', cascade="all, delete-orphan")
+    # --- End Modification ---
+
+    # portfolio_items relationship defined via backref in PortfolioItem
 
     def __repr__(self):
         return f'<Milestone {self.sequence}. {self.name}>'
@@ -93,17 +96,12 @@ class Step(db.Model):
     estimated_time_minutes = db.Column(db.Integer, nullable=True)
     milestone_id = db.Column(db.Integer, db.ForeignKey('milestones.id'), nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    # --- << NEW FIELD >> ---
-    # Define types like: Learning, Project, Assessment, Reading, Video, Practice, Setup, Informational etc.
-    # Making it nullable=True is safer when adding to existing tables initially.
-    step_type = db.Column(db.String(50), nullable=True, index=True)
-    # --- << END NEW FIELD >> ---
-
+    step_type = db.Column(db.String(50), nullable=True, index=True) # Added via migration
 
     # Relationships
     resources = db.relationship('Resource', backref='step', lazy='dynamic', cascade="all, delete-orphan")
     # user_statuses defined via backref in UserStepStatus
+    # portfolio_items defined via backref in PortfolioItem
 
     def __repr__(self):
         return f'<Step {self.sequence}. {self.name}>'
@@ -116,7 +114,6 @@ class Resource(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     url = db.Column(db.String(500), nullable=False)
-    # Type: e.g., 'Course', 'Video', 'Article', 'Tool', 'Documentation', 'Project Idea', 'Guide', 'Platform', 'Practice'
     resource_type = db.Column(db.String(50), nullable=True)
     step_id = db.Column(db.Integer, db.ForeignKey('steps.id'), nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -127,7 +124,7 @@ class Resource(db.Model):
         return f'<Resource {self.name} ({self.resource_type})>'
 
 
-# --- New Model for User Progress Tracking ---
+# --- Model for User Progress Tracking ---
 
 class UserStepStatus(db.Model):
     """Tracks the completion status of a Step for a specific User."""
@@ -136,23 +133,21 @@ class UserStepStatus(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     step_id = db.Column(db.Integer, db.ForeignKey('steps.id'), nullable=False, index=True)
-    # Status: 'not_started', 'completed' (could add 'in_progress' later)
-    status = db.Column(db.String(20), nullable=False, default='not_started', index=True) # Added index
+    status = db.Column(db.String(20), nullable=False, default='not_started', index=True)
     completed_at = db.Column(db.DateTime, nullable=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    # Defines 'step_statuses' collection on User
     user = db.relationship('User', backref=db.backref('step_statuses', lazy='dynamic', cascade="all, delete-orphan"))
-    # Defines 'user_statuses' collection on Step
     step = db.relationship('Step', backref=db.backref('user_statuses', lazy='dynamic', cascade="all, delete-orphan"))
 
-    # Ensure a user can only have one status per step
     __table_args__ = (db.UniqueConstraint('user_id', 'step_id', name='_user_step_uc'),)
 
     def __repr__(self):
         return f'<UserStepStatus User:{self.user_id} Step:{self.step_id} Status:{self.status}>'
 
+
+# --- Model for Portfolio Items ---
 
 class PortfolioItem(db.Model):
     """Represents an item in a user's portfolio (project, certificate, etc.)."""
@@ -162,14 +157,9 @@ class PortfolioItem(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    # Type: 'Certificate', 'Project', 'Article', 'Blog Post', 'Other'
     item_type = db.Column(db.String(50), nullable=False, default='Other')
-    # URL for externally hosted items (GitHub repo, live demo, article link)
     link_url = db.Column(db.String(500), nullable=True)
-    # Filename for internally hosted files (uploaded certificates, project files)
-    # Consider storing in a subdirectory like 'uploads/portfolio/'
     file_filename = db.Column(db.String(255), nullable=True)
-    # Optional: Link item back to a specific step or milestone completion
     associated_step_id = db.Column(db.Integer, db.ForeignKey('steps.id'), nullable=True, index=True)
     associated_milestone_id = db.Column(db.Integer, db.ForeignKey('milestones.id'), nullable=True, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
