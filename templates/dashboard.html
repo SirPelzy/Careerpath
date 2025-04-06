@@ -101,25 +101,18 @@
                           </ul>
                         {% endif %} {# End if step.resources #}
 
-                        {# --- Conditionally Add Proof Link --- #}
-                        {% set proof_keywords = ['project', 'build', 'showcase', 'certificate', 'assessment', 'complete', 'portfolio', 'internship'] %} {# Added internship #}
-                        {% set show_proof_link = False %}
-                        {% for keyword in proof_keywords %}
-                          {% if keyword in step.name|lower %}
-                            {% set show_proof_link = True %}
-                          {% endif %}
-                        {% endfor %}
+                        {# --- << NEW: Conditional Add Proof Link based on step_type >> --- #}
+                        {# Define which step types should show the "Add Proof" link #}
+                        {% set proof_relevant_types = ['Project', 'Certificate', 'Assessment', 'Internship'] %} {# Adjust this list as needed #}
 
-                        {% if show_proof_link %}
+                        {% if step.step_type in proof_relevant_types %}
                           <div class="mt-2">
                               <a href="{{ url_for('add_portfolio_item', step_id=step.id) }}" class="btn btn-sm btn-outline-secondary py-0" title="Add proof or link for this step">
                                   <small><i class="bi bi-paperclip me-1"></i>Link/Upload Proof</small>
                               </a>
                           </div>
                         {% endif %}
-                        {# --- End Conditional Add Proof Link --- #}
-
-                      </div> {# End Step Details Div #}
+                        {# --- << End Conditional Add Proof Link >> --- #}
 
                       {# Step Completion Status/Button #}
                       <span class="badge bg-light text-dark ms-2 align-self-center">
