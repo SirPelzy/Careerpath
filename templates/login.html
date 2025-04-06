@@ -42,6 +42,9 @@
     </form>
     <div class="text-center">
         <small>Need an account? <a href="{{ url_for('register') }}">Sign Up</a></small>
+        {# --- Add Forgot Password Link --- #}
+        <small><a href="{{ url_for('request_reset') }}">Forgot Password?</a></small>
+        {# --- End Forgot Password Link --- #}
         </div>
   </div>
 </div>
