@@ -907,6 +907,73 @@ def profile():
                            form=form,
                            is_homepage=False) # Use sidebar navigation
 
+
+# --- NEW CV Download Route ---
+@app.route('/cv-download')
+@login_required
+def download_cv():
+    """Allows the user to download their uploaded CV."""
+    if not current_user.cv_filename:
+        flash("No CV uploaded.", "warning")
+        return redirect(url_for('profile'))
+
+    # CVs are stored directly in UPLOAD_FOLDER based on current logic
+    cv_directory = app.config['UPLOAD_FOLDER']
+    filename = current_user.cv_filename
+
+    try:
+        return send_from_directory(cv_directory, filename, as_attachment=True)
+    except FileNotFoundError:
+        # Optionally clear the bad filename from DB if file missing? Or just show error.
+        # current_user.cv_filename = None
+        # db.session.commit()
+        flash("Error: Your CV file was not found on the server. Please upload it again.", "danger")
+        return redirect(url_for('profile'))
+    except Exception as e:
+        print(f"Error sending CV file {filename} for user {current_user.id}: {e}")
+        flash("An error occurred while trying to download your CV.", "danger")
+        return redirect(url_for('profile'))
+
+
+# --- NEW CV Delete Route ---
+@app.route('/cv-delete', methods=['POST'])
+@login_required
+def delete_cv():
+    """Deletes the user's uploaded CV."""
+    filename_to_delete = current_user.cv_filename
+
+    if not filename_to_delete:
+        flash("No CV to delete.", "info")
+        return redirect(url_for('profile'))
+
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename_to_delete)
+
+    try:
+        # Delete file from filesystem first
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            print(f"Deleted CV file: {file_path}")
+        else:
+            print(f"CV file not found for deletion, but clearing DB record: {file_path}")
+
+        # Clear filename reference in database
+        current_user.cv_filename = None
+        db.session.commit()
+        flash("CV deleted successfully.", "success")
+
+    except OSError as e:
+        # Error during file deletion
+        db.session.rollback() # Rollback DB change if file deletion failed critically
+        print(f"Error deleting CV file {file_path}: {e}")
+        flash("An error occurred while deleting the CV file.", "danger")
+    except Exception as e:
+        # Error during DB commit
+        db.session.rollback()
+        print(f"Error clearing CV filename in DB for user {current_user.id}: {e}")
+        flash("An error occurred while updating your profile after CV deletion.", "danger")
+
+    return redirect(url_for('profile'))
+
 # --- Password Reset Routes ---
 
 @app.route("/reset_password", methods=['GET', 'POST'])
