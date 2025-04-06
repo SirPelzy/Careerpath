@@ -6,7 +6,7 @@
 <div class="row justify-content-center">
   <div class="col-md-5">
     <h2>Log In</h2>
-    <form method="POST" action="">
+    <form method="POST" action="" novalidate>
         {{ form.hidden_tag() }} <div class="mb-3">
             {{ form.email.label(class="form-label") }}
             {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else ""), placeholder="you@example.com") }}
@@ -48,4 +48,52 @@
         </div>
   </div>
 </div>
+
+{# --- << NEW: Bootstrap Modal for Reset Link >> --- #}
+<div class="modal fade" id="resetLinkModal" tabindex="-1" aria-labelledby="resetLinkModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="resetLinkModalLabel">Password Reset Link (DEV MODE)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>If an account exists for the email provided, a reset link would normally be sent.</p>
+        <p>For development/testing purposes, use the link below:</p>
+        {% if reset_url %}
+          <div class="alert alert-info" role="alert">
+             <a href="{{ reset_url }}" target="_blank" rel="noopener noreferrer">{{ reset_url }}</a>
+          </div>
+           <small class="text-muted">(This link expires in 30 minutes)</small>
+        {% else %}
+           <p class="text-danger">Error: Reset URL not found.</p>
+        {% endif %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{# --- << End Modal >> --- #}
 {% endblock %}
+
+{# --- << NEW: JavaScript block to trigger modal >> --- #}
+{% block scripts %}
+  {{ super() }} {# Include scripts from base template if any #}
+  {% if show_reset_modal and reset_url %}
+  <script>
+    // Ensure the DOM is ready before trying to manipulate it
+    document.addEventListener('DOMContentLoaded', function() {
+        var resetModalElement = document.getElementById('resetLinkModal');
+        if (resetModalElement) {
+            var myModal = new bootstrap.Modal(resetModalElement, {});
+            myModal.show();
+        } else {
+            console.error("Modal element #resetLinkModal not found.");
+        }
+    });
+  </script>
+  {% endif %}
+{% endblock %}
+{# --- << End JavaScript block >> --- #}
