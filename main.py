@@ -571,6 +571,27 @@ def toggle_step_status(step_id):
 
         # Commit the change (either update or add)
         db.session.commit()
+        # --- << ADD THIS BLOCK: Check if Milestone is now Complete >> ---
+        if user_status.status == 'completed' and step.milestone: # Check only if step was marked complete
+            milestone = step.milestone
+            # Efficiently check if all steps in this milestone are complete for this user
+            all_milestone_step_ids_query = Step.query.filter_by(milestone_id=milestone.id).with_entities(Step.id)
+            all_milestone_step_ids = {step_id for step_id, in all_milestone_step_ids_query.all()}
+            total_steps_in_milestone = len(all_milestone_step_ids)
+
+            if total_steps_in_milestone > 0:
+                # Query only the completed steps for this user WITHIN this milestone
+                completed_statuses_in_milestone_query = UserStepStatus.query.filter(
+                    UserStepStatus.user_id == current_user.id,
+                    UserStepStatus.status == 'completed',
+                    UserStepStatus.step_id.in_(all_milestone_step_ids) # Filter by steps in this milestone
+                ).with_entities(UserStepStatus.step_id)
+                completed_step_ids_in_milestone = {step_id for step_id, in completed_statuses_in_milestone_query.all()}
+
+                # If the count matches, flash a success message
+                if len(completed_step_ids_in_milestone) == total_steps_in_milestone:
+                    flash(f'Congratulations! You completed Milestone: "{milestone.name}"', 'success alert-dismissible fade show') # Use success category and make dismissible
+        # --- << End Milestone Completion Check >> ---
 
     except Exception as e:
         # Rollback in case of database error
