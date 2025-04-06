@@ -10,13 +10,10 @@ from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
 from dotenv import load_dotenv
 from sqlalchemy.orm import selectinload
-
-
-# Import Models
 from models import db, User, CareerPath, Milestone, Step, Resource, UserStepStatus, PortfolioItem
-
-# Import Forms (Make sure EditProfileForm and RecommendationTestForm are imported)
 from forms import RegistrationForm, LoginForm, OnboardingForm, PortfolioItemForm, EditProfileForm, RecommendationTestForm
+from forms import RequestResetForm, ResetPasswordForm
+from itsdangerous import URLSafeTimedSerializer as Serializer
 
 print("DEBUG: Importing Migrate...") # <-- Add Print
 try:
@@ -814,6 +811,84 @@ def profile():
                            title='Edit Profile',
                            form=form,
                            is_homepage=False) # Use sidebar navigation
+
+# --- Password Reset Routes ---
+
+@app.route("/reset_password", methods=['GET', 'POST'])
+def request_reset():
+    """Route for requesting a password reset."""
+    if current_user.is_authenticated:
+        return redirect(url_for('home')) # Or dashboard
+    form = RequestResetForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data.lower()).first()
+        if user:
+            # Generate Token (using user ID)
+            s = Serializer(current_app.config['SECRET_KEY'])
+            token_salt = 'password-reset-salt' # Use a salt specific to this process
+            token = s.dumps(user.id, salt=token_salt)
+            reset_url = url_for('reset_token', token=token, _external=True)
+
+            # --- !!! DEVELOPMENT ONLY: Display link instead of emailing !!! ---
+            print(f"DEBUG: Password Reset URL for {user.email}: {reset_url}") # Print to console
+            flash(f'DEV MODE: If an account exists for {form.email.data}, a reset link would be sent. For testing, use this link: {reset_url}', 'info')
+            # --- !!! END DEVELOPMENT ONLY --- !!!
+
+            # --- !!! PRODUCTION: Send Email (Requires Flask-Mail setup) !!! ---
+            # msg = Message('Password Reset Request',
+            #               sender='noreply@yourdomain.com',
+            #               recipients=[user.email])
+            # msg.body = f'''To reset your password, visit the following link:
+            # {reset_url}
+
+            # If you did not make this request then simply ignore this email and no changes will be made.
+            # This link will expire in 30 minutes.
+            # '''
+            # mail.send(msg) # Assumes 'mail = Mail(app)' is configured
+            # flash('An email has been sent with instructions to reset your password.', 'info')
+            # --- !!! END PRODUCTION --- !!!
+
+        else:
+             # Still flash generic message even if user not found for security
+             flash('If an account exists for that email, instructions to reset your password have been sent.', 'info')
+
+        return redirect(url_for('login')) # Redirect to login after request
+
+    # Determine layout based on authentication status
+    is_homepage_layout = not current_user.is_authenticated
+    return render_template('request_reset.html', title='Reset Password Request', form=form, is_homepage=is_homepage_layout)
+
+
+@app.route("/reset_password/<token>", methods=['GET', 'POST'])
+def reset_token(token):
+    """Route for resetting password using a token."""
+    if current_user.is_authenticated:
+        return redirect(url_for('home')) # Or dashboard
+
+    # Use the static method on User model to verify token
+    user = User.verify_reset_token(token)
+
+    if user is None:
+        flash('That is an invalid or expired token. Please request a new one.', 'warning')
+        return redirect(url_for('request_reset'))
+
+    # If token is valid, show the password reset form
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        try:
+            user.set_password(form.password.data) # Use the existing method to hash password
+            db.session.commit()
+            flash('Your password has been updated! You are now able to log in.', 'success')
+            return redirect(url_for('login'))
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error resetting password for user {user.id}: {e}")
+            flash('An error occurred while resetting your password. Please try again.', 'danger')
+
+    # Determine layout based on authentication status
+    is_homepage_layout = not current_user.is_authenticated
+    return render_template('reset_password.html', title='Reset Password', form=form, token=token, is_homepage=is_homepage_layout)
+
 
 
 # --- <<< TEMPORARY ADMIN ROUTE FOR DB INIT & SEEDING >>> ---
