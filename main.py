@@ -9,6 +9,7 @@ from flask_wtf.csrf import CSRFProtect
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
 from dotenv import load_dotenv
+from sqlalchemy.orm import selectinload
 
 
 # Import Models
@@ -100,8 +101,14 @@ def dashboard():
 
     if target_path:
         # Fetch milestones ordered by sequence
-        milestones = Milestone.query.filter_by(career_path_id=target_path.id).order_by(Milestone.sequence).all()
-
+        # --- MODIFIED Query: Eagerly load steps ---
+        milestones = Milestone.query.options(
+            selectinload(Milestone.steps) # Eager load the 'steps' for each milestone
+        ).filter_by(
+            career_path_id=target_path.id
+        ).order_by(Milestone.sequence).all()
+        # --- End MODIFIED Query ---
+        
         # Fetch all Step IDs AND associated Resource details for the user's current path efficiently
         path_steps_resources_query = db.session.query(
                 Step.id,
