@@ -20,6 +20,7 @@ class User(UserMixin, db.Model):
     last_name = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
+    email_verified = db.Column(db.Boolean, nullable=False, default=False, index=True)
 
     # Onboarding / Profile Fields
     current_role = db.Column(db.String(100), nullable=True)
@@ -78,6 +79,30 @@ class User(UserMixin, db.Model):
             print(f"Error loading token: {e}")
             return None
         # If loads() successful, return the user
+        return User.query.get(user_id)
+    # --- END Static Method ---
+
+# --- NEW Static Method for Email Token Verification ---
+    @staticmethod
+    def verify_email_token(token, salt='email-confirm-salt', max_age_seconds=86400): # 86400 seconds = 24 hours
+        """Verifies an email confirmation token."""
+        s = Serializer(current_app.config['SECRET_KEY'])
+        try:
+            user_id = s.loads(
+                token,
+                salt=salt,
+                max_age=max_age_seconds
+            )
+        except SignatureExpired:
+            print("Email verification token expired.")
+            return None
+        except BadSignature:
+            print("Email verification token has bad signature.")
+            return None
+        except Exception as e:
+            print(f"Error loading email token: {e}")
+            return None
+        # Return user if token is valid
         return User.query.get(user_id)
     # --- END Static Method ---
 
