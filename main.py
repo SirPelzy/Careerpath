@@ -525,52 +525,60 @@ def portfolio():
     items = PortfolioItem.query.filter_by(user_id=current_user.id).order_by(PortfolioItem.created_at.desc()).all()
     return render_template('portfolio.html', title='My Portfolio', portfolio_items=items, is_homepage=False)
 
+# --- Portfolio Add Route ---
 @app.route('/portfolio/add', methods=['GET', 'POST'])
 @login_required
 def add_portfolio_item():
-    """Handles adding a new portfolio item."""
-    # Ensure PortfolioItemForm is imported
+    """Handles adding a new portfolio item, optionally linked to a step/milestone."""
     form = PortfolioItemForm()
-    # --- << NEW: Check for association ID on GET >> ---
-    step_id_from_url = request.args.get('step_id', type=int)
-    milestone_id_from_url = request.args.get('milestone_id', type=int) # Allow for future use
-    # You might want to fetch the Step/Milestone object here to display its name
-    linked_item_name = None
-    if step_id_from_url:
-        linked_step = Step.query.get(step_id_from_url)
-        if linked_step:
-            linked_item_name = f"Step: {linked_step.name}"
-    # Add similar logic for milestone_id if needed
-    # --- << End Check >> ---
-    if form.validate_on_submit():
-        link_url = form.link_url.data
-        file_filename_to_save = None
 
+    # --- Get association info only on GET to display linked item name ---
+    step_id_from_url = None
+    milestone_id_from_url = None # Allow for future use
+    linked_item_name = None
+    if request.method == 'GET':
+        step_id_from_url = request.args.get('step_id', type=int)
+        milestone_id_from_url = request.args.get('milestone_id', type=int)
+        if step_id_from_url:
+            # Query the step to display its name - handle if not found
+            linked_step = Step.query.get(step_id_from_url)
+            if linked_step:
+                linked_item_name = f"Step: {linked_step.name}"
+            else:
+                step_id_from_url = None # Clear invalid ID
+                flash("Invalid associated step ID provided.", "warning")
+        # Add similar logic for milestone_id if needed
+
+    if form.validate_on_submit():
+        # Executed on valid POST request
+        link_url = form.link_url.data
+        file_filename_to_save = None # Filename to store in DB
+
+        # Handle file upload
         if form.item_file.data:
             file = form.item_file.data
             base_filename = secure_filename(file.filename)
             unique_id = uuid.uuid4().hex
             name, ext = os.path.splitext(base_filename)
             ext = ext.lower()
-            name = name[:100]
+            name = name[:100] # Limit base name length
             file_filename_to_save = f"user_{current_user.id}_portfolio_{unique_id}{ext}"
             try:
+                # Ensure get_portfolio_upload_path helper exists or define path directly
                 file_path = get_portfolio_upload_path(file_filename_to_save)
                 file.save(file_path)
                 print(f"Portfolio file saved to: {file_path}")
             except Exception as e:
                 print(f"Error saving portfolio file: {e}")
                 flash('Error uploading file. Please try again.', 'danger')
-                file_filename_to_save = None
+                file_filename_to_save = None # Don't save filename in DB if file save failed
 
-        # --- << NEW: Get association IDs from hidden form fields (if added) >> ---
-        # Or simply use the variables captured during the GET request if not editing
-        # For simplicity, let's reuse the IDs captured on GET for the initial Add.
-        # If editing, we'd handle association differently.
-        assoc_step_id = step_id_from_url # Use ID captured when page loaded
-        assoc_milestone_id = milestone_id_from_url # Use ID captured when page loaded
-        # --- << End Get Association >> ---
+        # --- Read association IDs from hidden fields in the submitted FORM data ---
+        assoc_step_id = request.form.get('associated_step_id', type=int)
+        assoc_milestone_id = request.form.get('associated_milestone_id', type=int)
+        # --- End Read Association ---
 
+        # Create new PortfolioItem object
         new_item = PortfolioItem(
             user_id=current_user.id,
             title=form.title.data,
@@ -578,10 +586,9 @@ def add_portfolio_item():
             item_type=form.item_type.data,
             link_url=link_url if link_url else None,
             file_filename=file_filename_to_save,
-            # --- << NEW: Set association IDs >> ---
+            # Set association IDs read from the form
             associated_step_id=assoc_step_id,
             associated_milestone_id=assoc_milestone_id
-            # --- << End Set Association >> ---
         )
         try:
             db.session.add(new_item)
@@ -592,16 +599,27 @@ def add_portfolio_item():
             db.session.rollback()
             print(f"Error adding portfolio item to DB: {e}")
             flash('Error saving portfolio item. Please try again.', 'danger')
+            # Re-render form if save fails, passing original IDs back
+            return render_template('add_edit_portfolio_item.html',
+                                   title='Add Portfolio Item',
+                                   form=form,
+                                   is_edit=False,
+                                   step_id=assoc_step_id, # Use ID from form attempt
+                                   milestone_id=assoc_milestone_id, # Use ID from form attempt
+                                   linked_item_name=linked_item_name, # Keep name from original GET
+                                   is_homepage=False)
 
-    return render_template('add_edit_portfolio_item.html', 
-                           title='Add Portfolio Item', 
-                           form=form, 
-                           is_edit=False, 
-                           step_id=step_id_from_url, # Pass ID
-                           milestone_id=milestone_id_from_url, # Pass ID
-                           linked_item_name=linked_item_name, # Pass name for display
+
+    # Render template for GET request or if POST validation failed
+    # Pass association IDs from URL (if any) to pre-populate hidden fields on initial GET
+    return render_template('add_edit_portfolio_item.html',
+                           title='Add Portfolio Item',
+                           form=form,
+                           is_edit=False,
+                           step_id=step_id_from_url, # ID from URL for hidden field
+                           milestone_id=milestone_id_from_url, # ID from URL for hidden field
+                           linked_item_name=linked_item_name, # Name from URL for display
                            is_homepage=False)
-
 
 @app.route('/portfolio/<int:item_id>/edit', methods=['GET', 'POST'])
 @login_required
