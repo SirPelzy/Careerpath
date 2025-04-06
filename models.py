@@ -2,6 +2,9 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+from itsdangerous import URLSafeTimedSerializer as Serializer
+from itsdangerous.exc import SignatureExpired, BadSignature
+from flask import current_app # To access SECRET_KEY
 
 # Initialize SQLAlchemy instance - This will be imported and initialized in main.py
 db = SQLAlchemy()
@@ -43,6 +46,40 @@ class User(UserMixin, db.Model):
 
     def __repr__(self):
         return f'<User {self.email}>'
+
+    # --- NEW Static Method for Token Verification ---
+    @staticmethod
+    def verify_reset_token(token, salt='password-reset-salt', max_age_seconds=1800): # 1800 seconds = 30 minutes
+        """
+        Verifies a password reset token.
+
+        Args:
+            token (str): The token received from the user.
+            salt (str): Salt used during token generation. Must match.
+            max_age_seconds (int): Maximum age of token in seconds.
+
+        Returns:
+            User: The user associated with the token if valid and not expired, otherwise None.
+        """
+        s = Serializer(current_app.config['SECRET_KEY'])
+        try:
+            user_id = s.loads(
+                token,
+                salt=salt,
+                max_age=max_age_seconds
+            )
+        except SignatureExpired:
+            print("Password reset token expired.")
+            return None
+        except BadSignature:
+            print("Password reset token has bad signature.")
+            return None
+        except Exception as e: # Catch other potential errors
+            print(f"Error loading token: {e}")
+            return None
+        # If loads() successful, return the user
+        return User.query.get(user_id)
+    # --- END Static Method ---
 
 
 class CareerPath(db.Model):
