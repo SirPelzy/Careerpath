@@ -3,7 +3,7 @@ import uuid
 import datetime
 from flask_migrate import Migrate
 from werkzeug.utils import secure_filename # To sanitize filenames
-from flask import Flask, render_template, redirect, url_for, flash, request, abort, current_app, session
+from flask import Flask, render_template, redirect, url_for, flash, request, abort, current_app, session, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from flask_bcrypt import Bcrypt
