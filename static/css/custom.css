@@ -1,0 +1,142 @@
+/* static/css/custom.css */
+
+/* Define color variables */
+:root {
+  --cp-orange: #F34213;
+  --cp-gold: #D6BA73;
+  --cp-grey: #AAADC4;
+  --cp-teal: #136F63;
+  --cp-dark: #041B15;
+  --cp-light: #f8f9fa; /* Default light grey */
+  --cp-white: #ffffff;
+}
+
+/* Basic Body Styling */
+body {
+  color: var(--cp-dark);
+  /* Consider adding a default font later */
+}
+
+/* --- Basic Bootstrap Overrides --- */
+
+/* Primary Buttons (using Teal) */
+.btn-primary {
+  background-color: var(--cp-teal);
+  border-color: var(--cp-teal);
+  color: var(--cp-white);
+}
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active {
+  background-color: #0e5a4f; /* Darker teal */
+  border-color: #0e5a4f;
+  color: var(--cp-white);
+}
+
+ /* Outline Primary Buttons */
+.btn-outline-primary {
+  border-color: var(--cp-teal);
+  color: var(--cp-teal);
+}
+.btn-outline-primary:hover, .btn-outline-primary:focus, .btn-outline-primary:active {
+  background-color: var(--cp-teal);
+  border-color: var(--cp-teal);
+  color: var(--cp-white);
+}
+
+/* Accent Color (Orange for secondary CTAs maybe?) */
+.btn-accent {
+    background-color: var(--cp-orange);
+    border-color: var(--cp-orange);
+    color: var(--cp-white);
+}
+ .btn-accent:hover, .btn-accent:focus, .btn-accent:active {
+    background-color: #d93a10; /* Darker orange */
+    border-color: #d93a10;
+    color: var(--cp-white);
+}
+
+
+/* Links */
+a {
+  color: var(--cp-teal);
+}
+a:hover {
+  color: #0e5a4f; /* Darker teal */
+}
+
+/* Backgrounds */
+.bg-dark-theme {
+  background-color: var(--cp-dark) !important; /* Use important if needed to override BS */
+  color: var(--cp-light);
+}
+ .bg-dark-theme a { color: var(--cp-white); }
+ .bg-dark-theme a:hover { color: var(--cp-grey); }
+
+.bg-grey-theme {
+    background-color: var(--cp-grey);
+    color: var(--cp-dark);
+}
+.bg-teal-theme {
+    background-color: var(--cp-teal);
+    color: var(--cp-white);
+}
+ .bg-teal-theme a { color: var(--cp-white); }
+
+/* Add more overrides as needed for navbar, footer, cards etc. */
+
+/* Example: Style for sidebar nav links */
+.offcanvas .nav-link {
+    color: var(--cp-dark);
+}
+.offcanvas .nav-link.active {
+    color: var(--cp-teal);
+    font-weight: bold;
+}
+.offcanvas .nav-link:hover {
+    color: var(--cp-teal);
+}
+
+/* Landing Page Specific Styles (Examples) */
+.hero-section {
+    padding: 4rem 0;
+    /* background-color: var(--cp-light); */ /* Optional background */
+}
+
+.feature-section {
+    padding: 3rem 0;
+}
+
+.value-prop-card {
+    border: none;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border-radius: 0.5rem;
+    color: var(--cp-white); /* Default text color for cards */
+    height: 100%; /* Make cards in a row equal height */
+}
+ /* Specific background colors for value prop cards */
+.value-prop-card.bg-orange { background-color: var(--cp-orange); }
+.value-prop-card.bg-gold { background-color: var(--cp-gold); color: var(--cp-dark); /* Darker text on gold */}
+.value-prop-card.bg-teal { background-color: var(--cp-teal); }
+.value-prop-card.bg-grey { background-color: var(--cp-grey); color: var(--cp-dark); /* Darker text on grey */}
+
+.value-prop-metric {
+    font-size: 2.5rem;
+    font-weight: bold;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.final-cta-section {
+     padding: 4rem 0;
+     background-color: var(--cp-light);
+}
+
+.footer-section {
+     padding: 3rem 0;
+}
+ .footer-section h5 {
+    color: var(--cp-gold); /* Example: Gold headings in footer */
+ }
+ .footer-section ul { list-style: none; padding-left: 0; }
+ .footer-section ul li a { color: var(--cp-grey); text-decoration: none;}
+ .footer-section ul li a:hover { color: var(--cp-white); }
