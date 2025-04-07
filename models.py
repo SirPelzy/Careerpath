@@ -31,6 +31,15 @@ class User(UserMixin, db.Model):
     learning_style = db.Column(db.String(50), nullable=True)
     cv_filename = db.Column(db.String(255), nullable=True)
     onboarding_complete = db.Column(db.Boolean, default=False, nullable=False)
+    # --- << NEW Subscription Fields >> ---
+    # Plan names should match your pricing tiers, e.g., 'Free', 'Starter', 'Pro'
+    plan = db.Column(db.String(50), nullable=False, default='Free', index=True)
+    subscription_active = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    # Optional: Store Paystack Customer Code if you create customers
+    paystack_customer_code = db.Column(db.String(100), nullable=True, unique=True, index=True)
+    # Optional: Store subscription expiry if relevant
+    subscription_expiry = db.Column(db.DateTime, nullable=True)
+    # --- << End Subscription Fields >> ---
 
     # Relationships
     target_career_path = db.relationship('CareerPath', backref='users_targeting')
