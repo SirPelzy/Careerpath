@@ -4,46 +4,6 @@
 
 {% block content %}
 
-{# --- NEW Homepage Header (replaces the one from base.html) --- #}
-<header class="homepage-navbar sticky-top"> {# Make it sticky? Optional #}
-  <nav class="container navbar navbar-expand-lg">
-      <a class="navbar-brand fs-4" href="{{ url_for('home') }}">Careerpath!</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#homepageNav" aria-controls="homepageNav" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="homepageNav">
-        <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
-          {# Placeholder Nav Links - Inspired by ada.cx #}
-          <li class="nav-item"><a class="nav-link {% if request.endpoint == 'features_placeholder' %}active{% endif %}" href="#features">Features</a></li>
-          {# <li class="nav-item"><a class="nav-link" href="#">Paths</a></li> #}
-          {# <li class="nav-item"><a class="nav-link" href="#">Resources</a></li> #}
-          <li class="nav-item"><a class="nav-link {% if request.endpoint == 'pricing_page' %}active{% endif %}" href="{{ url_for('pricing_page') }}">Pricing</a></li>
-          {# Conditional Login/Register or User Actions #}
-          {% if not current_user.is_authenticated %}
-            <li class="nav-item ms-lg-2"><a class="nav-link" href="{{ url_for('login') }}">Sign In</a></li>
-            <li class="nav-item"><a class="btn btn-primary btn-sm px-3 ms-lg-2" href="{{ url_for('register') }}">Get Started Free</a></li>
-          {% else %}
-            <li class="nav-item dropdown ms-lg-2">
-               <a class="nav-link dropdown-toggle" href="#" id="navbarUserDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                 <i class="bi bi-person-circle me-1"></i> {{ current_user.first_name }}
-               </a>
-               <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarUserDropdown">
-                 <li><a class="dropdown-item" href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                 <li><a class="dropdown-item" href="{{ url_for('profile') }}">Profile</a></li>
-                 <li><a class="dropdown-item" href="{{ url_for('portfolio') }}">Portfolio</a></li>
-                 <li><hr class="dropdown-divider"></li>
-                 <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
-               </ul>
-            </li>
-             <li class="nav-item"><a class="btn btn-accent btn-sm px-3 ms-lg-2" href="#">Book a Demo</a></li> {# Example secondary button #}
-          {% endif %}
-        </ul>
-      </div>
-  </nav>
-</header>
-{# --- End Homepage Header --- #}
-
-
 {# --- Hero Section (Reversed Columns, Updated Text/Buttons) --- #}
 <div class="hero-section">
   <div class="container col-xxl-8 px-4 py-5">
