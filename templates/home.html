@@ -1,20 +1,210 @@
 {% extends "base.html" %}
 
-{% block title %}Welcome - Careerpath!{% endblock %}
+{% block title %}Careerpath! - Your AI Guide to a Tech Career in Nigeria{% endblock %}
 
 {% block content %}
-  <div class="px-4 py-5 my-5 text-center">
-    <h1 class="display-5 fw-bold">Welcome to Careerpath!</h1>
-    <div class="col-lg-6 mx-auto">
-      <p class="lead mb-4">Your personalized AI guide to navigating the transition into a tech career. Find clarity, build skills, and land your dream tech job.</p>
-      <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
-        {% if current_user.is_authenticated %}
-          <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg px-4 gap-3">Go to Dashboard</a>
-        {% else %}
-          <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg px-4 gap-3">Get Started</a>
-          <a href="{{ url_for('login') }}" class="btn btn-outline-secondary btn-lg px-4">Login</a>
-        {% endif %}
+
+{# --- Hero Section --- #}
+<div class="hero-section">
+  <div class="container col-xxl-8 px-4 py-5">
+    <div class="row flex-lg-row-reverse align-items-center g-5 py-5">
+      <div class="col-10 col-sm-8 col-lg-6">
+        {# Placeholder for Graphic - Maybe add an SVG or image later #}
+        <div class="lc-block bg-light ratio ratio-1x1 rounded-3" style="background-color: var(--cp-grey) !important;">
+           <p class="display-1 text-center text-white d-flex align-items-center justify-content-center">?</p>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="lc-block mb-3">
+            <h1 class="display-4 fw-bold lh-1 text-dark my-3">Navigate Your Tech Career Transition with AI</h1>
+            <p class="lead">Stop feeling lost. Careerpath! provides personalized, step-by-step guidance, curated resources, and portfolio building tools to help you land your dream tech job in Nigeria and beyond.</p>
+        </div>
+
+        <div class="lc-block d-grid gap-2 d-md-flex justify-content-md-start">
+          {# Link to register if not logged in, else dashboard #}
+          {% if not current_user.is_authenticated %}
+            <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg px-4 me-md-2">Get Started Free</a>
+            <a href="#features" class="btn btn-outline-secondary btn-lg px-4">Learn More</a>
+          {% else %}
+             <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg px-4 me-md-2">Go to Dashboard</a>
+             <a href="#features" class="btn btn-outline-secondary btn-lg px-4">Explore Features</a>
+          {% endif %}
+        </div>
       </div>
     </div>
   </div>
+</div>
+{# --- End Hero Section --- #}
+
+{# --- Logo Bar / Social Proof (Placeholder) --- #}
+<div class="py-5 border-bottom">
+    <div class="container">
+        <p class="text-center text-muted small">TRUSTED BY ASPIRING TECH PROFESSIONALS ACROSS NIGERIA</p>
+        {# Add logos here later if applicable #}
+        <div class="text-center mt-3 text-muted">[Logo Placeholder Area]</div>
+    </div>
+</div>
+{# --- End Logo Bar --- #}
+
+
+{# --- Value Propositions / Key Metrics --- #}
+<div class="container px-4 py-5">
+    <h2 class="pb-2 border-bottom text-center">Your Clear Path to a Tech Career</h2>
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4 py-5">
+
+      <div class="col d-flex align-items-start">
+        <div class="value-prop-card bg-teal text-center">
+          <span class="value-prop-metric">1</span>
+          <h4 class="fw-bold mb-0">Personalized Roadmap</h4>
+          <p>AI-driven, step-by-step plan based on your goals, time, and background.</p>
+        </div>
+      </div>
+
+      <div class="col d-flex align-items-start">
+         <div class="value-prop-card bg-orange text-center">
+           <span class="value-prop-metric">2</span>
+          <h4 class="fw-bold mb-0">Curated Resources</h4>
+          <p>Stop drowning in information. Get relevant courses, projects, and tools for each step.</p>
+        </div>
+      </div>
+
+      <div class="col d-flex align-items-start">
+         <div class="value-prop-card bg-gold text-center">
+          <span class="value-prop-metric">3</span>
+          <h4 class="fw-bold mb-0">Portfolio Builder</h4>
+          <p>Track completed projects and certificates, ready to showcase to employers.</p>
+        </div>
+      </div>
+
+      <div class="col d-flex align-items-start">
+         <div class="value-prop-card bg-grey text-center">
+           <span class="value-prop-metric">4</span>
+          <h4 class="fw-bold mb-0">Career Focused</h4>
+          <p>Guidance includes resume tips, interview prep ideas, and job search support.</p>
+        </div>
+      </div>
+
+    </div>
+</div>
+{# --- End Value Props --- #}
+
+{# --- Features Section (Example - Add more based on ada.cx screenshots) --- #}
+<div id="features" class="feature-section bg-light">
+    <div class="container px-4 py-5">
+         <h2 class="pb-2 text-center">How Careerpath! Works</h2>
+         {# Example Feature Row (Text Left, Image Right) #}
+         <div class="row align-items-center g-5 py-5">
+             <div class="col-lg-6">
+                  <h3 class="fw-bold">1. Tell Us About You</h3>
+                  <p>Complete a simple onboarding or take our recommendation test to identify the best tech path for you based on your interests and constraints.</p>
+                  <a href="{{ url_for('register') if not current_user.is_authenticated else url_for('profile') }}" class="btn btn-outline-primary">Update Your Profile</a>
+             </div>
+              <div class="col-lg-6">
+                  {# Placeholder for image/graphic #}
+                  <div class="bg-secondary ratio ratio-16x9 rounded-3"></div>
+              </div>
+         </div>
+         {# Example Feature Row (Image Left, Text Right) #}
+         <div class="row align-items-center g-5 py-5">
+              <div class="col-lg-6">
+                   {# Placeholder for image/graphic #}
+                   <div class="bg-secondary ratio ratio-16x9 rounded-3"></div>
+              </div>
+              <div class="col-lg-6">
+                  <h3 class="fw-bold">2. Follow Your Personalized Path</h3>
+                  <p>Access your dashboard showing clear milestones and actionable steps. Track progress, find curated resources, and get timeline estimates.</p>
+                   <a href="{{ url_for('dashboard') if current_user.is_authenticated else url_for('login') }}" class="btn btn-outline-primary">View Dashboard</a>
+             </div>
+         </div>
+          {# Add more feature sections inspired by ada.cx layout (vertical timeline, tabs etc.) #}
+          {# This will require more detailed HTML/CSS later #}
+    </div>
+</div>
+{# --- End Features Section --- #}
+
+
+{# --- Final CTA Section --- #}
+<div class="final-cta-section">
+    <div class="container text-center py-5">
+        <h2 class="display-5 fw-bold">Ready to Start Your Tech Journey?</h2>
+        <p class="lead mb-4">Gain clarity and confidence. Let Careerpath! be your guide.</p>
+         {% if not current_user.is_authenticated %}
+            <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg px-5 py-3 me-md-2">Sign Up Free</a>
+         {% else %}
+             <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg px-5 py-3 me-md-2">Go To Your Dashboard</a>
+         {% endif %}
+    </div>
+</div>
+{# --- End Final CTA Section --- #}
+
+
+{# --- Footer Section --- #}
+<footer class="footer-section bg-dark-theme pt-5 pb-4">
+    <div class="container">
+        <div class="row">
+            {# Column 1: Logo & About #}
+            <div class="col-lg-4 col-md-6 mb-4">
+                <h3 class="text-white">Careerpath!</h3>
+                <p class="small">Your AI-powered guide for navigating your tech career transition in Nigeria and beyond.</p>
+                {# Social Icons placeholder #}
+                <div>
+                    <a href="#" class="text-white me-2"><i class="bi bi-twitter-x"></i></a>
+                    <a href="#" class="text-white me-2"><i class="bi bi-linkedin"></i></a>
+                    <a href="#" class="text-white me-2"><i class="bi bi-facebook"></i></a>
+                </div>
+            </div>
+
+            {# Column 2: Paths #}
+            <div class="col-lg-2 col-md-6 mb-4">
+                <h5>Paths</h5>
+                <ul class="list-unstyled">
+                    <li><a href="#">Data Analysis</a></li> {# Make these links later #}
+                    <li><a href="#">UX/UI Design</a></li>
+                    <li><a href="#">Cybersecurity</a></li>
+                    <li><a href="#">Software Engineering</a></li>
+                </ul>
+            </div>
+
+            {# Column 3: Resources #}
+            <div class="col-lg-2 col-md-6 mb-4">
+                <h5>Resources</h5>
+                 <ul class="list-unstyled">
+                    <li><a href="#">Blog</a></li> {# Add later #}
+                    <li><a href="#">Community</a></li> {# Add later #}
+                    <li><a href="{{ url_for('contact_page') if false else '#' }}">Contact Us</a></li> {# Link contact page #}
+                </ul>
+            </div>
+
+            {# Column 4: Company #}
+            <div class="col-lg-2 col-md-6 mb-4">
+                 <h5>Company</h5>
+                 <ul class="list-unstyled">
+                    <li><a href="#">About Us</a></li> {# Add later #}
+                    <li><a href="{{ url_for('pricing_page') if false else '#' }}">Pricing</a></li> {# Link pricing page #}
+                    <li><a href="#">Careers</a></li> {# Add later #}
+                </ul>
+            </div>
+
+             {# Column 5: Newsletter (Optional) #}
+            <div class="col-lg-2 col-md-6 mb-4">
+                 <h5>Newsletter</h5>
+                 <form>
+                     <div class="input-group mb-3">
+                        <input type="email" class="form-control form-control-sm" placeholder="Email address" aria-label="Email address">
+                        <button class="btn btn-sm btn-accent" type="button">Go</button> {# Using Accent color #}
+                      </div>
+                 </form>
+            </div>
+        </div>
+        <hr style="border-color: rgba(255,255,255,0.2);">
+         <div class="text-center small">
+            &copy; {{ now.year }} Careerpath! All rights reserved.
+             <a href="#" class="ms-3">Privacy Policy</a>
+             <a href="#" class="ms-3">Terms of Service</a>
+         </div>
+    </div>
+</footer>
+{# --- End Footer Section --- #}
+
+
 {% endblock %}
