@@ -105,14 +105,22 @@
              </div>
               <div class="col-lg-6">
                   {# Placeholder for image/graphic #}
-                  <div class="bg-secondary ratio ratio-16x9 rounded-3"></div>
+                  <div class="bg-secondary ratio ratio-16x9 rounded-3">
+                    <img src="{{ url_for('static', filename='images/img-1.png') }}"
+                         alt="Careerpath guiding a user"
+                         class="img-fluid rounded-3 shadow-sm"> {# Responsive, rounded, optional shadow #}
+                  </div>
               </div>
          </div>
          {# Example Feature Row (Image Left, Text Right) #}
          <div class="row align-items-center g-5 py-5">
               <div class="col-lg-6">
                    {# Placeholder for image/graphic #}
-                   <div class="bg-secondary ratio ratio-16x9 rounded-3"></div>
+                   <div class="bg-secondary ratio ratio-16x9 rounded-3">
+                     <img src="{{ url_for('static', filename='images/img-2.png') }}"
+                         alt="Careerpath guiding a user"
+                         class="img-fluid rounded-3 shadow-sm"> {# Responsive, rounded, optional shadow #}
+                   </div>
               </div>
               <div class="col-lg-6">
                   <h3 class="fw-bold">2. Follow Your Personalized Path</h3>
