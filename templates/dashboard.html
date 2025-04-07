@@ -163,3 +163,135 @@
   {% endif %}
 
 {% endblock %}
+                          
+{# --- NEW: Scripts Block for AJAX --- #}
+{% block scripts %}
+{{ super() }} {# Include scripts from base template if any #}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // --- Toast Initialization & Helper Function ---
+    const toastLiveElement = document.getElementById('liveToast');
+    const toastTitleElement = document.getElementById('toastTitle');
+    const toastBodyElement = document.getElementById('toastBody');
+    let liveToast = null;
+    if (toastLiveElement) {
+        liveToast = new bootstrap.Toast(toastLiveElement, { delay: 3000 }); // 3 second delay
+    }
+
+    function showToast(message, title = 'Notification', isError = false) {
+        if (liveToast && toastBodyElement && toastTitleElement) {
+             toastBodyElement.textContent = message;
+             toastTitleElement.textContent = title;
+             // Optional: Change header color based on error
+             toastLiveElement.querySelector('.toast-header').classList.toggle('bg-danger', isError);
+             toastLiveElement.querySelector('.toast-header').classList.toggle('text-white', isError);
+             toastLiveElement.querySelector('.toast-header').classList.toggle('bg-light', !isError);
+            liveToast.show();
+        } else {
+            console.error("Toast elements not found!");
+            // Fallback alert for critical errors
+            if(isError) alert("Error: " + message);
+        }
+    }
+    // --- End Toast ---
+
+
+    // --- AJAX Step Toggle Logic ---
+    const dashboardContent = document.querySelector('.accordion'); // Or a more specific parent container
+
+    if (dashboardContent) {
+        dashboardContent.addEventListener('submit', function(event) {
+            // Check if the submitted element is a toggle form
+            if (event.target.classList.contains('toggle-step-form')) {
+                event.preventDefault(); // Stop normal form submission
+
+                const form = event.target;
+                const url = form.action;
+                const stepId = form.dataset.stepId;
+                const milestoneId = form.dataset.milestoneId; // Get milestone ID
+                const csrfToken = form.querySelector('input[name="csrf_token"]').value;
+                const buttonContainer = form.parentElement; // The span containing the form
+
+                // Basic Loading Indicator (optional)
+                form.querySelector('button').disabled = true;
+                form.querySelector('button small').textContent = '...';
+
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken // Send CSRF token in header
+                        // Add other headers if needed, like 'Accept': 'application/json'
+                    }
+                    // No body needed for this simple toggle POST
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        // Handle HTTP errors (like 500)
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json(); // Parse JSON response
+                })
+                .then(data => {
+                    if (data.success) {
+                        showToast(data.message, 'Update Success');
+
+                        // Update the UI for this specific step
+                        if (data.new_status === 'completed') {
+                             // Replace form with "Completed" badge
+                             buttonContainer.innerHTML = `
+                                <span class="text-success fw-bold">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-circle-fill me-1" viewBox="0 0 16 16" style="vertical-align: -0.125em;">
+                                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                                    </svg>Completed
+                                </span>`;
+                        } else {
+                            // Replace "Completed" badge with the form (needed if implementing toggle back)
+                            // For now, we only go one way, but this structure allows it
+                             buttonContainer.innerHTML = `
+                                <form method="POST" action="${url}" class="d-inline toggle-step-form" data-step-id="${stepId}" data-milestone-id="${milestoneId}">
+                                    <input type="hidden" name="csrf_token" value="${csrfToken}"/>
+                                    <button type="submit" class="btn btn-sm btn-outline-success py-0" title="Mark as complete">
+                                        <small>Done?</small>
+                                    </button>
+                                </form>`;
+                        }
+
+                        // --- TODO: Update Progress Bars Dynamically (More complex) ---
+                        // This requires getting the updated progress data from the backend response
+                        // and targeting the specific progress bars/text elements.
+                        // Example (requires backend to send milestone_progress & overall_progress):
+                        // if (data.milestone_progress && data.milestone_id) {
+                        //     updateMilestoneProgress(data.milestone_id, data.milestone_progress);
+                        // }
+                        // if (data.overall_progress) {
+                        //     updateOverallProgress(data.overall_progress);
+                        // }
+                        // console.log("Progress bars should update - implementation pending.");
+                        // --- End TODO ---
+
+
+                    } else {
+                        // Show error from backend JSON
+                        showToast(data.message || 'An unknown error occurred.', 'Update Failed', true);
+                         // Re-enable button on failure
+                         form.querySelector('button').disabled = false;
+                         form.querySelector('button small').textContent = 'Done?';
+                    }
+                })
+                .catch(error => {
+                    console.error('Fetch Error:', error);
+                    showToast('Could not connect to server. Please try again.', 'Network Error', true);
+                    // Re-enable button on failure
+                    form.querySelector('button').disabled = false;
+                    form.querySelector('button small').textContent = 'Done?';
+                });
+            } // end if target is toggle form
+        }); // end event listener
+    } // end if dashboardContent exists
+
+}); // end DOMContentLoaded
+</script>
+{% endblock %}
+{# --- End Scripts Block --- #}
