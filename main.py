@@ -273,7 +273,8 @@ def dashboard():
                            total_completed_steps=total_completed_steps,
                            overall_percent_complete=overall_percent_complete,
                            recommended_resource_ids=recommended_resource_ids, # Pass the new set
-                           is_homepage=False) # Pass flag for layout
+                           is_homepage=False,
+                           body_class='in-app-layout') # Pass flag for layout
 
 
 # --- Authentication Routes ---
@@ -373,7 +374,7 @@ def logout():
 def onboarding():
     if current_user.onboarding_complete:
          return redirect(url_for('dashboard'))
-    return render_template('onboarding_choice.html', title='Choose Your Start', is_homepage=False)
+    return render_template('onboarding_choice.html', title='Choose Your Start', is_homepage=False, body_class='in-app-layout')
 
 # --- Onboarding Form Route (Handles actual form) ---
 @app.route('/onboarding/form', methods=['GET', 'POST'])
@@ -435,7 +436,8 @@ def onboarding_form():
     return render_template('onboarding_form.html',
                            title='Complete Your Profile',
                            form=form,
-                           is_homepage=False)
+                           is_homepage=False,
+                           body_class='in-app-layout')
 
 # --- Recommendation Test Route ---
 @app.route('/recommendation-test', methods=['GET', 'POST'])
@@ -506,7 +508,8 @@ def recommendation_test():
     return render_template('recommendation_test.html',
                            title="Career Recommendation Test",
                            form=form,
-                           is_homepage=False)
+                           is_homepage=False,
+                           body_class='in-app-layout')
 
 # --- Recommendation Results Route ---
 @app.route('/recommendation-results') # GET only
@@ -528,7 +531,8 @@ def recommendation_results():
                             title="Your Recommendation",
                             recommended_paths=recommended_paths_info, # Pass the list
                             is_multiple=is_multiple, # Pass flag for template logic
-                            is_homepage=False)
+                            is_homepage=False,
+                           body_class='in-app-layout')
 
 # --- Route to Toggle Step Completion Status ---
 @app.route('/path/step/<int:step_id>/toggle', methods=['POST'])
@@ -615,7 +619,7 @@ def get_portfolio_upload_path(filename):
 def portfolio():
     """Displays the user's portfolio items."""
     items = PortfolioItem.query.filter_by(user_id=current_user.id).order_by(PortfolioItem.created_at.desc()).all()
-    return render_template('portfolio.html', title='My Portfolio', portfolio_items=items, is_homepage=False)
+    return render_template('portfolio.html', title='My Portfolio', portfolio_items=items, is_homepage=False, body_class='in-app-layout')
 
 # --- Portfolio Add Route ---
 @app.route('/portfolio/add', methods=['GET', 'POST'])
@@ -699,7 +703,8 @@ def add_portfolio_item():
                                    step_id=assoc_step_id, # Use ID from form attempt
                                    milestone_id=assoc_milestone_id, # Use ID from form attempt
                                    linked_item_name=linked_item_name, # Keep name from original GET
-                                   is_homepage=False)
+                                   is_homepage=False,
+                                   body_class='in-app-layout')
 
 
     # Render template for GET request or if POST validation failed
@@ -711,7 +716,8 @@ def add_portfolio_item():
                            step_id=step_id_from_url, # ID from URL for hidden field
                            milestone_id=milestone_id_from_url, # ID from URL for hidden field
                            linked_item_name=linked_item_name, # Name from URL for display
-                           is_homepage=False)
+                           is_homepage=False,
+                           body_class='in-app-layout')
 
 @app.route('/portfolio/<int:item_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -773,7 +779,7 @@ def edit_portfolio_item(item_id):
             print(f"Error updating portfolio item {item_id}: {e}")
             flash('Error updating portfolio item. Please try again.', 'danger')
 
-    return render_template('add_edit_portfolio_item.html', title='Edit Portfolio Item', form=form, is_edit=True, item=item, is_homepage=False)
+    return render_template('add_edit_portfolio_item.html', title='Edit Portfolio Item', form=form, is_edit=True, item=item, is_homepage=False, body_class='in-app-layout')
 
 
 @app.route('/portfolio/<int:item_id>/delete', methods=['POST'])
@@ -934,7 +940,8 @@ def profile():
     return render_template('profile.html',
                            title='Edit Profile',
                            form=form,
-                           is_homepage=False) # Use sidebar navigation
+                           is_homepage=False,
+                           body_class='in-app-layout') # Use sidebar navigation
 
 
 # --- NEW CV Download Route ---
