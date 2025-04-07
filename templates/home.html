@@ -88,37 +88,93 @@
 </div>
 {# --- End Logo Bar --- #}
 
-{# --- Value Propositions / Key Metrics (No Change Needed) --- #}
+{# --- Value Propositions / Key Metrics --- #}
 <div class="container px-4 py-5">
     <h2 class="pb-2 border-bottom text-center">Your Clear Path to a Tech Career</h2>
-    {# ... existing value prop row ... #}
     <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4 py-5">
-        <div class="col d-flex align-items-start"> <div class="value-prop-card bg-teal text-center">...</div> </div>
-        <div class="col d-flex align-items-start"> <div class="value-prop-card bg-orange text-center">...</div> </div>
-        <div class="col d-flex align-items-start"> <div class="value-prop-card bg-gold text-center">...</div> </div>
-        <div class="col d-flex align-items-start"> <div class="value-prop-card bg-grey text-center">...</div> </div>
+
+      <div class="col d-flex align-items-start">
+        <div class="value-prop-card bg-teal text-center">
+          <span class="value-prop-metric">1</span>
+          <h4 class="fw-bold mb-0">Personalized Roadmap</h4>
+          <p>AI-driven, step-by-step plan based on your goals, time, and background.</p>
+        </div>
+      </div>
+
+      <div class="col d-flex align-items-start">
+         <div class="value-prop-card bg-orange text-center">
+           <span class="value-prop-metric">2</span>
+          <h4 class="fw-bold mb-0">Curated Resources</h4>
+          <p>Stop drowning in information. Get relevant courses, projects, and tools for each step.</p>
+        </div>
+      </div>
+
+      <div class="col d-flex align-items-start">
+         <div class="value-prop-card bg-gold text-center">
+          <span class="value-prop-metric">3</span>
+          <h4 class="fw-bold mb-0">Portfolio Builder</h4>
+          <p>Track completed projects and certificates, ready to showcase to employers.</p>
+        </div>
+      </div>
+
+      <div class="col d-flex align-items-start">
+         <div class="value-prop-card bg-grey text-center">
+           <span class="value-prop-metric">4</span>
+          <h4 class="fw-bold mb-0">Career Focused</h4>
+          <p>Guidance includes resume tips, interview prep ideas, and job search support.</p>
+        </div>
+      </div>
+
     </div>
 </div>
 {# --- End Value Props --- #}
 
 
-{# --- Features Section (No Change Needed - Add content later) --- #}
+{# --- Features Section (Example - Add more based on ada.cx screenshots) --- #}
 <div id="features" class="feature-section bg-light">
     <div class="container px-4 py-5">
          <h2 class="pb-2 text-center">How Careerpath! Works</h2>
-         {# ... existing feature rows ... #}
-         <div class="row align-items-center g-5 py-5"> ... </div>
-         <div class="row align-items-center g-5 py-5"> ... </div>
+         {# Example Feature Row (Text Left, Image Right) #}
+         <div class="row align-items-center g-5 py-5">
+             <div class="col-lg-6">
+                  <h3 class="fw-bold">1. Tell Us About You</h3>
+                  <p>Complete a simple onboarding or take our recommendation test to identify the best tech path for you based on your interests and constraints.</p>
+                  <a href="{{ url_for('register') if not current_user.is_authenticated else url_for('profile') }}" class="btn btn-outline-primary">Update Your Profile</a>
+             </div>
+              <div class="col-lg-6">
+                  {# Placeholder for image/graphic #}
+                  <div class="bg-secondary ratio ratio-16x9 rounded-3"></div>
+              </div>
+         </div>
+         {# Example Feature Row (Image Left, Text Right) #}
+         <div class="row align-items-center g-5 py-5">
+              <div class="col-lg-6">
+                   {# Placeholder for image/graphic #}
+                   <div class="bg-secondary ratio ratio-16x9 rounded-3"></div>
+              </div>
+              <div class="col-lg-6">
+                  <h3 class="fw-bold">2. Follow Your Personalized Path</h3>
+                  <p>Access your dashboard showing clear milestones and actionable steps. Track progress, find curated resources, and get timeline estimates.</p>
+                   <a href="{{ url_for('dashboard') if current_user.is_authenticated else url_for('login') }}" class="btn btn-outline-primary">View Dashboard</a>
+             </div>
+         </div>
+          {# Add more feature sections inspired by ada.cx layout (vertical timeline, tabs etc.) #}
+          {# This will require more detailed HTML/CSS later #}
     </div>
 </div>
 {# --- End Features Section --- #}
 
 
-{# --- Final CTA Section (No Change Needed) --- #}
+{# --- Final CTA Section --- #}
 <div class="final-cta-section">
     <div class="container text-center py-5">
         <h2 class="display-5 fw-bold">Ready to Start Your Tech Journey?</h2>
-        {# ... existing cta text/button ... #}
+        <p class="lead mb-4">Gain clarity and confidence. Let Careerpath! be your guide.</p>
+         {% if not current_user.is_authenticated %}
+            <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg px-5 py-3 me-md-2">Sign Up Free</a>
+         {% else %}
+             <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg px-5 py-3 me-md-2">Go To Your Dashboard</a>
+         {% endif %}
     </div>
 </div>
 {# --- End Final CTA Section --- #}
