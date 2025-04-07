@@ -13,7 +13,7 @@
 
     <style>
       /* Ensure content isn't hidden behind fixed buttons */
-      body { padding-top: 4rem; } /* Increased padding slightly */
+      body.in-app-layout { padding-top: 4rem; }
       .offcanvas-trigger-btn {
         position: fixed;
         top: 1rem;
@@ -30,7 +30,7 @@
 
     <title>{% block title %}Careerpath!{% endblock %}</title>
   </head>
-  <body>
+  <body class="{{ body_class | default('') }}">
 
     {# --- Display Dark Navbar ONLY on NON-Homepage, Logged-Out Pages (e.g., Login, Register) --- #}
     {% if not is_homepage and not current_user.is_authenticated %}
