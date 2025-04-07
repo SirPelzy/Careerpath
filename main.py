@@ -846,6 +846,29 @@ def pricing_page():
     # Use is_homepage=True to show the main public navbar
     return render_template('pricing.html', title='Pricing', is_homepage=True)
 
+# --- NEW Contact Page Route ---
+@app.route('/contact', methods=['GET', 'POST'])
+def contact_page():
+    """Displays and handles the contact form."""
+    form = ContactForm()
+    if form.validate_on_submit():
+        # Process the form data (e.g., send email)
+        name = form.name.data
+        email = form.email.data
+        message = form.message.data
+
+        # --- Placeholder for Email Sending Logic ---
+        print(f"Contact Form Submitted:\n Name: {name}\n Email: {email}\n Message: {message}")
+        # In production, you would integrate Flask-Mail here to send the email
+        # mail.send_message(...)
+        # --- End Placeholder ---
+
+        flash("Thank you for your message! We'll get back to you soon.", "success")
+        return redirect(url_for('contact_page')) # Redirect back to clear form
+
+    # Assume contact uses homepage style (main nav)
+    return render_template('contact.html', title='Contact Us', form=form, is_homepage=True)
+
 # --- Profile Route ---
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
