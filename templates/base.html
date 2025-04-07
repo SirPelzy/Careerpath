@@ -6,21 +6,25 @@
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    {# --- Link Custom CSS --- #}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+    {# --- End Link --- #}
 
     <style>
-      /* Ensure content isn't hidden behind fixed button */
-      body { padding-top: 1rem; } /* Add some top padding */
+      /* Ensure content isn't hidden behind fixed buttons */
+      body { padding-top: 4rem; } /* Increased padding */
       .offcanvas-trigger-btn {
         position: fixed;
         top: 1rem;
         right: 1rem;
-        z-index: 1040; /* Ensure it's above most content but below offcanvas */
+        z-index: 1040;
+      }
       .back-link-fixed {
         position: fixed;
         top: 1rem;
-        left: 1rem; /* Position on the left */
-        z-index: 1040; /* Same level as hamburger button */
+        left: 1rem;
+        z-index: 1040;
       }
     </style>
 
@@ -28,94 +32,109 @@
   </head>
   <body>
 
-    {# --- Display Old Navbar ONLY on Homepage (or if not logged in) --- #}
-    {# The 'is_homepage' flag is passed from the route #}
+    {# --- Display Old Navbar ONLY on Homepage or if not logged in --- #}
     {% if is_homepage or not current_user.is_authenticated %}
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-      <div class="container-fluid">
-        <a class="navbar-brand" href="{{ url_for('home') }}">Careerpath!</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-          <ul class="navbar-nav ms-auto">
-            <li class="nav-item">
-              <a class="nav-link {% if request.endpoint == 'pricing_page' %}active{% endif %}" href="{{ url_for('pricing_page') }}">Pricing</a>
-            </li>
-            {# Public nav items here if needed #}
-            {% if not current_user.is_authenticated %}
-              <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('login') }}">Login</a>
+      <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container-fluid">
+          <a class="navbar-brand" href="{{ url_for('home') }}">Careerpath!</a>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+               {# --- Added Pricing Link --- #}
+               <li class="nav-item">
+                  <a class="nav-link {% if request.endpoint == 'pricing_page' %}active{% endif %}" href="{{ url_for('pricing_page') }}">Pricing</a>
               </li>
-              <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('register') }}">Register</a>
-              </li>
-            {% else %}
-             {# Maybe show dashboard/logout even on homepage if logged in? Optional #}
-             {# <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li> #}
-             {# <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li> #}
-            {% endif %}
-          </ul>
+              {# --- End Pricing Link --- #}
+              {% if not current_user.is_authenticated %}
+                <li class="nav-item">
+                  <a class="nav-link {% if request.endpoint == 'login' %}active{% endif %}" href="{{ url_for('login') }}">Login</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link {% if request.endpoint == 'register' %}active{% endif %}" href="{{ url_for('register') }}">Register</a>
+                </li>
+              {% else %}
+                {# Optionally show minimal links even on homepage navbar if logged in #}
+                {# e.g., <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li> #}
+              {% endif %}
+            </ul>
+          </div>
         </div>
-      </div>
-    </nav>
+      </nav>
     {% endif %}
     {# --- End Old Navbar --- #}
 
 
     {# --- Display Sidebar Trigger Button for Logged-in Users on In-App Pages --- #}
     {% if current_user.is_authenticated and not is_homepage %}
-    <button class="btn btn-outline-secondary offcanvas-trigger-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasAppMenu" aria-controls="offcanvasAppMenu">
-      <i class="bi bi-list"></i> {# Hamburger Icon #}
-    </button>
+      <button class="btn btn-outline-secondary offcanvas-trigger-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasAppMenu" aria-controls="offcanvasAppMenu">
+        <i class="bi bi-list fs-4"></i> {# Hamburger Icon - slightly larger #}
+      </button>
 
-    {# --- Offcanvas Sidebar Menu --- #}
-    <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasAppMenu" aria-labelledby="offcanvasAppMenuLabel">
-      <div class="offcanvas-header">
-        <h5 class="offcanvas-title" id="offcanvasAppMenuLabel">Menu</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      {# --- Offcanvas Sidebar Menu --- #}
+      <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasAppMenu" aria-labelledby="offcanvasAppMenuLabel">
+        <div class="offcanvas-header border-bottom"> {# Added border #}
+          <h5 class="offcanvas-title" id="offcanvasAppMenuLabel">Careerpath! Menu</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+          <ul class="navbar-nav justify-content-end flex-grow-1 pe-3">
+             <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+                  <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                </a>
+              </li>
+             <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">
+                   <i class="bi bi-person-circle me-2"></i>Profile
+                </a>
+              </li>
+             <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'portfolio' or request.endpoint.startswith('add_portfolio') or request.endpoint.startswith('edit_portfolio') %}active{% endif %}" href="{{ url_for('portfolio') }}">
+                   <i class="bi bi-briefcase-fill me-2"></i>Portfolio
+                </a>
+              </li>
+              {# Add Interview Prep Link #}
+              <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'interview_prep' %}active{% endif %}" href="{{ url_for('interview_prep') if false else '#' }}"> {# Link when route exists #}
+                   <i class="bi bi-clipboard2-check-fill me-2"></i>Interview Prep
+                </a>
+              </li>
+              {# Add CV Helper Link #}
+               <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'cv_helper' %}active{% endif %}" href="{{ url_for('cv_helper') if false else '#' }}"> {# Link when route exists #}
+                   <i class="bi bi-file-earmark-person-fill me-2"></i>CV Helper
+                </a>
+              </li>
+
+              {# Add future links here #}
+
+              <li class="nav-item mt-4 border-top pt-3"> {# More spacing before logout #}
+                <a class="nav-link" href="{{ url_for('logout') }}">
+                   <i class="bi bi-box-arrow-right me-2"></i>Logout
+                </a>
+              </li>
+          </ul>
+        </div>
       </div>
-      <div class="offcanvas-body">
-        <ul class="navbar-nav justify-content-end flex-grow-1 pe-3">
-           <li class="nav-item">
-              <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
-                <i class="bi bi-speedometer2 me-2"></i>Dashboard
-              </a>
-            </li>
-           <li class="nav-item">
-              <a class="nav-link {% if request.endpoint == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">
-                 <i class="bi bi-person-circle me-2"></i>Profile
-              </a>
-            </li>
-           <li class="nav-item">
-              <a class="nav-link {% if request.endpoint == 'portfolio' or request.endpoint.startswith('add_portfolio') or request.endpoint.startswith('edit_portfolio') %}active{% endif %}" href="{{ url_for('portfolio') }}">
-                 <i class="bi bi-briefcase-fill me-2"></i>Portfolio
-              </a>
-            </li>
-            {# Add future links here #}
-            <li class="nav-item mt-3 border-top pt-3">
-              <a class="nav-link" href="{{ url_for('logout') }}">
-                 <i class="bi bi-box-arrow-right me-2"></i>Logout
-              </a>
-            </li>
-        </ul>
-      </div>
-    </div>
-    {# --- End Offcanvas --- #}
+      {# --- End Offcanvas --- #}
     {% endif %}
 
 
     {# --- Main Page Content --- #}
-    <main class="container">
+    <main class="container mt-4"> {# Added margin top #}
       {# Flash Messages #}
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-          {% for category, message in messages %}
-            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-              {{ message }}
-              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-          {% endfor %}
+          <div class="flash-container" style="position: sticky; top: 0; z-index: 1050;"> {# Make flash messages stickier? Optional #}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show m-0 rounded-0 border-0" role="alert"> {# Adjust styling #}
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          </div>
         {% endif %}
       {% endwith %}
 
@@ -124,10 +143,70 @@
     </main>
     {# --- End Main Content --- #}
 
-    {# Footer (Optional) - Keep or remove as desired #}
-    <footer class="mt-5 text-center text-muted">
-      <p>&copy; {{ now.year }} Careerpath!</p>
+    {# Footer - Moved outside main container, added theme class #}
+    <footer class="footer-section bg-dark-theme pt-5 pb-4 mt-5">
+        <div class="container">
+            <div class="row">
+                {# Column 1: Logo & About #}
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <h3 class="text-white">Careerpath!</h3>
+                    <p class="small">Your AI-powered guide for navigating your tech career transition in Nigeria and beyond.</p>
+                    <div>
+                        <a href="#" class="text-white me-2"><i class="bi bi-twitter-x"></i></a>
+                        <a href="#" class="text-white me-2"><i class="bi bi-linkedin"></i></a>
+                        <a href="#" class="text-white me-2"><i class="bi bi-facebook"></i></a>
+                    </div>
+                </div>
+                {# Column 2: Paths #}
+                <div class="col-lg-2 col-md-6 mb-4">
+                    <h5>Paths</h5>
+                    <ul class="list-unstyled">
+                        <li><a href="#">Data Analysis</a></li>
+                        <li><a href="#">UX/UI Design</a></li>
+                        <li><a href="#">Cybersecurity</a></li>
+                        <li><a href="#">Software Engineering</a></li>
+                    </ul>
+                </div>
+                {# Column 3: Resources #}
+                <div class="col-lg-2 col-md-6 mb-4">
+                    <h5>Resources</h5>
+                     <ul class="list-unstyled">
+                        <li><a href="#">Blog</a></li>
+                        <li><a href="#">Community</a></li>
+                        <li><a href="{{ url_for('contact_page') }}">Contact Us</a></li>
+                    </ul>
+                </div>
+                {# Column 4: Company #}
+                <div class="col-lg-2 col-md-6 mb-4">
+                     <h5>Company</h5>
+                     <ul class="list-unstyled">
+                        <li><a href="#">About Us</a></li>
+                        <li><a href="{{ url_for('pricing_page') }}">Pricing</a></li>
+                        <li><a href="#">Careers</a></li>
+                    </ul>
+                </div>
+                 {# Column 5: Newsletter (Optional) #}
+                <div class="col-lg-2 col-md-6 mb-4">
+                     <h5>Newsletter</h5>
+                     <form>
+                         <label for="footer-newsletter-email" class="visually-hidden">Email address</label>
+                         <div class="input-group mb-3">
+                            <input id="footer-newsletter-email" type="email" class="form-control form-control-sm" placeholder="Email address" aria-label="Email address">
+                            <button class="btn btn-sm btn-accent" type="button">Go</button>
+                          </div>
+                     </form>
+                </div>
+            </div>
+            <hr style="border-color: rgba(255,255,255,0.2);">
+             <div class="text-center small">
+                &copy; {{ now.year }} Careerpath! All rights reserved.
+                 <a href="#" class="ms-3">Privacy Policy</a>
+                 <a href="#" class="ms-3">Terms of Service</a>
+             </div>
+        </div>
     </footer>
+    {# --- End Footer Section --- #}
+
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 
