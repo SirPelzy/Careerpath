@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Careerpath!{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    {# Main Content Column (Form etc.) #}
+    <div class="col-lg-7 col-md-8 mb-5 mb-md-0">
+      <h1 class="display-5 fw-bold mb-3">Talk to us!</h1>
+      <p class="lead text-muted mb-4">Have questions about Careerpath!, partnerships, or just want to say hello? Fill out the form below or use the alternative methods.</p>
+
+      <form method="POST" action="" novalidate>
+        {{ form.hidden_tag() }} <div class="mb-3">
+          {{ form.name.label(class="form-label fw-bold") }}
+          {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else "")) }}
+          {% if form.name.errors %}
+            <div class="invalid-feedback">
+              {% for error in form.name.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          {{ form.email.label(class="form-label fw-bold") }}
+          {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else "")) }}
+           {% if form.email.errors %}
+            <div class="invalid-feedback">
+              {% for error in form.email.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          {{ form.message.label(class="form-label fw-bold") }}
+          {{ form.message(class="form-control" + (" is-invalid" if form.message.errors else ""), rows="5") }}
+           {% if form.message.errors %}
+            <div class="invalid-feedback">
+              {% for error in form.message.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="d-grid">
+          {{ form.submit(class="btn btn-primary btn-lg") }}
+        </div>
+      </form>
+      <p class="mt-3 text-muted small">We'll get back to you soon.</p>
+
+    </div>
+
+    {# Sidebar Column (Alternative Info) #}
+    <div class="col-lg-4 col-md-4 offset-lg-1">
+       {# Placeholder mimicking the style #}
+       <div class="mb-4 p-3 border rounded-3 bg-light">
+          <h6 class="fw-bold">Prefer email?</h6>
+          <p class="mb-0 small text-muted">You can also reach us directly at:</p>
+          <a href="mailto:hello@careerpath.ng">hello@careerpath.ng</a> {# Replace with actual email #}
+       </div>
+       <div class="mb-4 p-3 border rounded-3 bg-light">
+          <h6 class="fw-bold">Prefer docs?</h6>
+          <p class="mb-0 small text-muted">Check out our documentation (coming soon!):</p>
+          <a href="#">Documentation</a> {# Link later #}
+       </div>
+        {# Optional: Add graphic elements later #}
+    </div>
+  </div>
+</div>
+{% endblock %}
