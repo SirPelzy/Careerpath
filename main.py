@@ -839,6 +839,12 @@ def download_portfolio_file(item_id):
         print(f"Error sending portfolio file {filename}: {e}")
         abort(500)
 
+# --- NEW Pricing Page Route ---
+@app.route('/pricing')
+def pricing_page():
+    """Displays the pricing page."""
+    # Use is_homepage=True to show the main public navbar
+    return render_template('pricing.html', title='Pricing', is_homepage=True)
 
 # --- Profile Route ---
 @app.route('/profile', methods=['GET', 'POST'])
