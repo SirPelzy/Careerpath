@@ -11,8 +11,10 @@
     <div class="row flex-lg-row align-items-center g-5 py-lg-5">
       {# Graphic Column (Now Left on Large Screens) #}
       <div class="col-10 col-sm-8 col-lg-6 order-lg-1">
-        <div class="lc-block hero-graphic-placeholder ratio ratio-4x3 rounded-3"> {# Changed ratio #}
-           <i class="bi bi-compass display-1 text-white"></i> {# Example Icon #}
+        <div class="lc-block"> {# Changed ratio #}
+          <img src="{{ url_for('static', filename='images/imager.png') }}"
+               alt="Careerpath guiding a user"
+               class="img-fluid rounded-3 shadow-sm"> {# Responsive, rounded, optional shadow #}
         </div>
       </div>
       {# Text Column (Now Right on Large Screens) #}
