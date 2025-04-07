@@ -14,7 +14,7 @@
 /* Basic Body Styling */
 body {
   color: var(--cp-dark);
-  /* Consider adding a default font later */
+  /* Consider adding a default font later: font-family: 'YourFont', sans-serif; */
 }
 
 /* --- Basic Bootstrap Overrides --- */
@@ -31,7 +31,7 @@ body {
   color: var(--cp-white);
 }
 
- /* Outline Primary Buttons */
+/* Outline Primary Buttons */
 .btn-outline-primary {
   border-color: var(--cp-teal);
   color: var(--cp-teal);
@@ -44,23 +44,25 @@ body {
 
 /* Accent Color (Orange for secondary CTAs maybe?) */
 .btn-accent {
-    background-color: var(--cp-orange);
-    border-color: var(--cp-orange);
-    color: var(--cp-white);
+  background-color: var(--cp-orange);
+  border-color: var(--cp-orange);
+  color: var(--cp-white);
 }
- .btn-accent:hover, .btn-accent:focus, .btn-accent:active {
-    background-color: #d93a10; /* Darker orange */
-    border-color: #d93a10;
-    color: var(--cp-white);
+.btn-accent:hover, .btn-accent:focus, .btn-accent:active {
+  background-color: #d93a10; /* Darker orange */
+  border-color: #d93a10;
+  color: var(--cp-white);
 }
 
 
 /* Links */
 a {
   color: var(--cp-teal);
+  text-decoration: none; /* Optional: remove default underline */
 }
 a:hover {
   color: #0e5a4f; /* Darker teal */
+  /* text-decoration: underline; */ /* Optional: underline on hover */
 }
 
 /* Backgrounds */
@@ -68,75 +70,140 @@ a:hover {
   background-color: var(--cp-dark) !important; /* Use important if needed to override BS */
   color: var(--cp-light);
 }
- .bg-dark-theme a { color: var(--cp-white); }
- .bg-dark-theme a:hover { color: var(--cp-grey); }
+.bg-dark-theme a { color: var(--cp-white); }
+.bg-dark-theme a:hover { color: var(--cp-grey); }
 
 .bg-grey-theme {
-    background-color: var(--cp-grey);
-    color: var(--cp-dark);
+  background-color: var(--cp-grey);
+  color: var(--cp-dark);
 }
 .bg-teal-theme {
-    background-color: var(--cp-teal);
-    color: var(--cp-white);
+  background-color: var(--cp-teal);
+  color: var(--cp-white);
 }
- .bg-teal-theme a { color: var(--cp-white); }
+.bg-teal-theme a { color: var(--cp-white); }
 
-/* Add more overrides as needed for navbar, footer, cards etc. */
 
-/* Example: Style for sidebar nav links */
+/* Example: Style for sidebar (Offcanvas) nav links */
 .offcanvas .nav-link {
-    color: var(--cp-dark);
+  color: var(--cp-dark);
+  padding-top: 0.75rem; /* Add some padding */
+  padding-bottom: 0.75rem;
 }
 .offcanvas .nav-link.active {
-    color: var(--cp-teal);
-    font-weight: bold;
+  color: var(--cp-teal);
+  font-weight: bold;
 }
 .offcanvas .nav-link:hover {
-    color: var(--cp-teal);
+  color: var(--cp-teal);
+  background-color: rgba(19, 111, 99, 0.05); /* Very light teal background on hover */
 }
 
-/* Landing Page Specific Styles (Examples) */
+
+/* --- Homepage Specific Styles --- */
+
+/* Navbar for Homepage */
+.homepage-navbar {
+  padding-top: 0.8rem;
+  padding-bottom: 0.8rem;
+  background-color: var(--cp-white); /* Light background */
+  border-bottom: 1px solid #e9ecef; /* Subtle border */
+}
+.homepage-navbar .navbar-brand {
+  font-weight: bold;
+  color: var(--cp-dark);
+}
+.homepage-navbar .nav-link {
+  color: var(--cp-dark);
+  padding-left: 0.8rem;
+  padding-right: 0.8rem;
+}
+.homepage-navbar .nav-link:hover,
+.homepage-navbar .nav-link:focus {
+  color: var(--cp-teal);
+}
+.homepage-navbar .nav-link.active {
+  font-weight: bold;
+  color: var(--cp-teal);
+}
+.homepage-navbar .btn-primary { /* Teal */
+   /* Default style from above is likely fine */
+}
+.homepage-navbar .btn-accent { /* Orange */
+   /* Default style from above is likely fine */
+}
+.homepage-navbar .btn-outline-secondary {
+    color: var(--cp-dark);
+    border-color: var(--cp-grey);
+}
+.homepage-navbar .btn-outline-secondary:hover {
+    color: var(--cp-dark);
+    background-color: var(--cp-grey);
+    border-color: var(--cp-grey);
+}
+
+/* Hero Section Refinements */
 .hero-section {
-    padding: 4rem 0;
-    /* background-color: var(--cp-light); */ /* Optional background */
+  padding: 2rem 0 4rem 0; /* Adjusted padding */
+  /* background-color: #fcfcff; */ /* Optional very light background */
+}
+.hero-graphic-placeholder {
+  background-color: var(--cp-grey); /* Use theme color */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cp-white);
+  font-weight: bold;
+  min-height: 250px; /* Give placeholder some height */
 }
 
+/* Feature Section */
 .feature-section {
-    padding: 3rem 0;
+  padding: 3rem 0;
 }
 
+/* Value Proposition Cards */
 .value-prop-card {
-    border: none;
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-    border-radius: 0.5rem;
-    color: var(--cp-white); /* Default text color for cards */
-    height: 100%; /* Make cards in a row equal height */
+  border: none;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  border-radius: 0.5rem;
+  color: var(--cp-white); /* Default text color */
+  height: 100%;
 }
- /* Specific background colors for value prop cards */
 .value-prop-card.bg-orange { background-color: var(--cp-orange); }
-.value-prop-card.bg-gold { background-color: var(--cp-gold); color: var(--cp-dark); /* Darker text on gold */}
+.value-prop-card.bg-gold { background-color: var(--cp-gold); color: var(--cp-dark); }
 .value-prop-card.bg-teal { background-color: var(--cp-teal); }
-.value-prop-card.bg-grey { background-color: var(--cp-grey); color: var(--cp-dark); /* Darker text on grey */}
+.value-prop-card.bg-grey { background-color: var(--cp-grey); color: var(--cp-dark); }
 
 .value-prop-metric {
-    font-size: 2.5rem;
-    font-weight: bold;
-    display: block;
-    margin-bottom: 0.5rem;
+  font-size: 2.5rem;
+  font-weight: bold;
+  display: block;
+  margin-bottom: 0.5rem;
 }
 
+/* Final CTA Section */
 .final-cta-section {
-     padding: 4rem 0;
-     background-color: var(--cp-light);
+   padding: 4rem 0;
+   background-color: var(--cp-light);
 }
 
+/* Footer Section */
 .footer-section {
-     padding: 3rem 0;
+   padding: 3rem 0;
+   /* Uses bg-dark-theme class for background/text color */
 }
- .footer-section h5 {
-    color: var(--cp-gold); /* Example: Gold headings in footer */
- }
- .footer-section ul { list-style: none; padding-left: 0; }
- .footer-section ul li a { color: var(--cp-grey); text-decoration: none;}
- .footer-section ul li a:hover { color: var(--cp-white); }
+.footer-section h5 {
+  color: var(--cp-gold); /* Gold headings in footer */
+  margin-bottom: 1rem;
+}
+.footer-section ul { list-style: none; padding-left: 0; margin-bottom: 0;}
+.footer-section ul li { margin-bottom: 0.5rem; }
+.footer-section ul li a { color: var(--cp-grey); text-decoration: none;}
+.footer-section ul li a:hover { color: var(--cp-white); }
+.footer-section .input-group .form-control { border-radius: 0.375rem 0 0 0.375rem;} /* Fix button overlap */
+.footer-section .input-group .btn { border-radius: 0 0.375rem 0.375rem 0;} /* Fix button overlap */
+.footer-section hr { border-color: rgba(255,255,255,0.2); margin-top: 2rem;}
+.footer-section .small a { color: var(--cp-grey); }
+.footer-section .small a:hover { color: var(--cp-white); }
