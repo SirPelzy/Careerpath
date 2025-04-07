@@ -150,26 +150,73 @@
   </main>
   {# --- End Main Content --- #}
 
-  {# --- Footer Section --- #}
-  <footer class="footer-section bg-dark-theme pt-5 pb-4 mt-5">
-      {# ... footer content (same as before) ... #}
-      <div class="container">
-          <div class="row">
-              <div class="col-lg-4 col-md-6 mb-4"> ... </div>
-              <div class="col-lg-2 col-md-6 mb-4"> ... </div>
-              <div class="col-lg-2 col-md-6 mb-4"> ... </div>
-              <div class="col-lg-2 col-md-6 mb-4"> ... </div>
-              <div class="col-lg-2 col-md-6 mb-4"> ... </div>
-          </div>
-          <hr style="border-color: rgba(255,255,255,0.2);">
-          <div class="text-center small"> ... </div>
-      </div>
-  </footer>
-  {# --- End Footer Section --- #}
+  {# Footer Section #}
+    <footer class="footer-section bg-dark-theme pt-5 pb-4 mt-5">
+        <div class="container">
+            <div class="row">
+                {# Column 1: Logo & About #}
+                <div class="col-lg-4 col-md-6 mb-4">
+                    <h3 class="text-white">Careerpath!</h3>
+                    <p class="small">Your AI-powered guide for navigating your tech career transition in Nigeria and beyond.</p>
+                    <div>
+                        <a href="#" class="text-white me-2"><i class="bi bi-twitter-x"></i></a>
+                        <a href="#" class="text-white me-2"><i class="bi bi-linkedin"></i></a>
+                        <a href="#" class="text-white me-2"><i class="bi bi-facebook"></i></a>
+                    </div>
+                </div>
+                {# Column 2: Paths #}
+                <div class="col-lg-2 col-md-6 mb-4">
+                    <h5>Paths</h5>
+                    <ul class="list-unstyled">
+                        <li><a href="#">Data Analysis</a></li>
+                        <li><a href="#">UX/UI Design</a></li>
+                        <li><a href="#">Cybersecurity</a></li>
+                        <li><a href="#">Software Engineering</a></li>
+                    </ul>
+                </div>
+                {# Column 3: Resources #}
+                <div class="col-lg-2 col-md-6 mb-4">
+                    <h5>Resources</h5>
+                     <ul class="list-unstyled">
+                        <li><a href="#">Blog</a></li>
+                        <li><a href="#">Community</a></li>
+                        <li><a href="{{ url_for('contact_page') }}">Contact Us</a></li>
+                    </ul>
+                </div>
+                {# Column 4: Company #}
+                <div class="col-lg-2 col-md-6 mb-4">
+                     <h5>Company</h5>
+                     <ul class="list-unstyled">
+                        <li><a href="#">About Us</a></li>
+                        <li><a href="{{ url_for('pricing_page') }}">Pricing</a></li>
+                        <li><a href="#">Careers</a></li>
+                    </ul>
+                </div>
+                 {# Column 5: Newsletter (Optional) #}
+                <div class="col-lg-2 col-md-6 mb-4">
+                     <h5>Newsletter</h5>
+                     <form>
+                         <label for="footer-newsletter-email" class="visually-hidden">Email address</label>
+                         <div class="input-group mb-3">
+                            <input id="footer-newsletter-email" type="email" class="form-control form-control-sm" placeholder="Email address" aria-label="Email address">
+                            <button class="btn btn-sm btn-accent" type="button">Go</button>
+                          </div>
+                     </form>
+                </div>
+            </div>
+            <hr style="border-color: rgba(255,255,255,0.2);">
+             <div class="text-center small">
+                &copy; {{ now.year }} Careerpath! All rights reserved.
+                 <a href="#" class="ms-3">Privacy Policy</a>
+                 <a href="#" class="ms-3">Terms of Service</a>
+             </div>
+        </div>
+    </footer>
+    {# --- End Footer Section --- #}
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 
-  {# Custom JS Block #}
-  {% block scripts %}{% endblock %}
+    {# Custom JS Block #}
+    {% block scripts %}{% endblock %}
 </body>
 </html>
