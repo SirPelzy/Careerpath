@@ -14,6 +14,19 @@ from models import db, User, CareerPath, Milestone, Step, Resource, UserStepStat
 from forms import RegistrationForm, LoginForm, OnboardingForm, PortfolioItemForm, EditProfileForm, RecommendationTestForm, ContactForm
 from forms import RequestResetForm, ResetPasswordForm
 from itsdangerous import URLSafeTimedSerializer as Serializer
+import requests # For making API calls
+import random
+import string
+
+# --- Define Plan Details ---
+# Prices are in kobo (lowest currency unit for NGN)
+PLANS = {
+    # Name key should be lowercase used in URL, 'name' is display name, amount is kobo
+    'basic':   {'name': 'Basic',   'amount': 8000 * 100, 'plan_code': None}, # 8,000 NGN
+    'starter': {'name': 'Starter', 'amount': 15000 * 100, 'plan_code': None}, # 15,000 NGN
+    'pro':     {'name': 'Pro',     'amount': 25000 * 100, 'plan_code': None}  # 25,000 NGN
+    # Add Paystack plan_code here if you create subscription plans on Paystack dashboard
+}
 
 print("DEBUG: Importing Migrate...") # <-- Add Print
 try:
@@ -80,6 +93,166 @@ def load_user(user_id):
 def home():
     # Pass is_homepage=True for the homepage
     return render_template('home.html', is_homepage=True)
+
+# --- NEW Subscription Initiation Route ---
+@app.route('/subscribe/<plan_name>')
+@login_required
+def subscribe(plan_name):
+    """Initiates a Paystack transaction for a selected plan."""
+    plan = PLANS.get(plan_name.lower())
+    secret_key = current_app.config.get('PAYSTACK_SECRET_KEY')
+
+    if not plan:
+        flash("Invalid pricing plan selected.", "danger")
+        return redirect(url_for('pricing_page'))
+
+    if not secret_key:
+        flash("Payment gateway not configured. Please contact support.", "danger")
+        return redirect(url_for('pricing_page'))
+
+    # Generate a unique reference for this transaction
+    # Example: careerpath_userid_timestamp_random
+    timestamp = datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')
+    random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+    reference = f"CPTH_{current_user.id}_{timestamp}_{random_str}"
+
+    # Paystack API endpoint for initializing transaction
+    url = "https://api.paystack.co/transaction/initialize"
+
+    headers = {
+        "Authorization": f"Bearer {secret_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "email": current_user.email,
+        "amount": plan['amount'], # Amount in kobo
+        "reference": reference,
+        "callback_url": url_for('payment_callback', _external=True),
+        "metadata": { # Optional: store extra info
+            "user_id": current_user.id,
+            "plan_name": plan['name'],
+            "custom_fields": [
+                {"display_name": "User Name", "variable_name": "user_name", "value": f"{current_user.first_name} {current_user.last_name}"}
+            ]
+        }
+        # Add 'plan': plan['plan_code'] if using Paystack Plans for subscriptions
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=20)
+        response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+        response_data = response.json()
+
+        if response_data.get("status") and response_data.get("data") and response_data["data"].get("authorization_url"):
+            auth_url = response_data["data"]["authorization_url"]
+            print(f"Redirecting user {current_user.id} to Paystack: {auth_url}") # Debug log
+            return redirect(auth_url)
+        else:
+            print(f"Paystack init error response: {response_data}")
+            flash(f"Could not initiate payment: {response_data.get('message', 'Unknown error')}", "danger")
+            return redirect(url_for('pricing_page'))
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error connecting to Paystack: {e}")
+        flash("Could not connect to payment gateway. Please try again later.", "danger")
+        return redirect(url_for('pricing_page'))
+    except Exception as e:
+        print(f"Error during payment initiation: {e}")
+        flash("An unexpected error occurred during payment initiation.", "danger")
+        return redirect(url_for('pricing_page'))
+
+
+# --- NEW Payment Callback Route ---
+@app.route('/payment/callback')
+def payment_callback():
+    """Handles the redirect back from Paystack after payment attempt."""
+    reference = request.args.get('reference')
+    secret_key = current_app.config.get('PAYSTACK_SECRET_KEY')
+
+    if not reference:
+        flash("Payment reference missing.", "warning")
+        return redirect(url_for('pricing_page'))
+
+    if not secret_key:
+        flash("Payment gateway configuration error.", "danger")
+        # Might redirect home or to an error page
+        return redirect(url_for('home'))
+
+    # Paystack API endpoint for verifying transaction
+    url = f"https://api.paystack.co/transaction/verify/{reference}"
+    headers = {"Authorization": f"Bearer {secret_key}"}
+
+    try:
+        response = requests.get(url, headers=headers, timeout=20)
+        response.raise_for_status()
+        response_data = response.json()
+
+        if response_data.get("status"):
+            data = response_data["data"]
+            # --- Verification Checks ---
+            if data.get("status") == "success":
+                # Payment was successful
+                paid_amount = data.get("amount")
+                customer_email = data.get("customer", {}).get("email", "").lower()
+                metadata_plan = data.get("metadata", {}).get("plan_name") # Get plan from metadata if stored
+
+                # Find user by email (less secure, consider user_id from metadata if possible)
+                user = User.query.filter_by(email=customer_email).first()
+                if not user:
+                    print(f"Verification successful but user not found for email: {customer_email}")
+                    flash("Payment verified, but could not find associated user account.", "warning")
+                    return redirect(url_for('login')) # Or register?
+
+                # Find plan details to verify amount
+                plan = PLANS.get(metadata_plan.lower() if metadata_plan else None) # Get plan details
+                if not plan or paid_amount != plan['amount']:
+                    print(f"Verification successful but amount mismatch for ref {reference}. Paid: {paid_amount}, Expected: {plan['amount'] if plan else 'N/A'}")
+                    flash("Payment verified, but amount did not match expected plan price. Please contact support.", "danger")
+                    # Don't upgrade plan, maybe redirect to profile/support
+                    if login_user(user): # Log user in if possible
+                        return redirect(url_for('profile')) # Redirect to profile to sort out
+                    else:
+                        return redirect(url_for('login'))
+
+
+                # --- Update User Subscription ---
+                print(f"Updating plan for user {user.id} to {plan['name']}")
+                user.plan = plan['name']
+                user.subscription_active = True
+                # Set expiry date later if applicable (e.g., +1 month/year from now)
+                user.subscription_expiry = None # Or calculate based on plan duration
+
+                try:
+                    db.session.commit()
+                    flash(f"Payment successful! Your account has been upgraded to the {plan['name']} plan.", "success")
+                    # Log the user in if they aren't already (they just came back from external site)
+                    if not current_user.is_authenticated:
+                         login_user(user) # Assumes login_user is imported
+                    return redirect(url_for('dashboard')) # Go to dashboard
+                except Exception as e_db:
+                     db.session.rollback()
+                     print(f"DB Error updating user plan after successful payment {reference}: {e_db}")
+                     flash("Payment successful, but failed to update your account plan. Please contact support.", "danger")
+                     if login_user(user): return redirect(url_for('profile'))
+                     else: return redirect(url_for('login'))
+
+            else: # Paystack status was not 'success'
+                print(f"Paystack verification status not 'success' for ref {reference}: {data.get('status')}")
+                flash(f"Payment was not successful ({data.get('gateway_response', 'No details')}). Please try again.", "warning")
+                return redirect(url_for('pricing_page'))
+        else: # Error in Paystack response format
+            print(f"Paystack verify error response: {response_data}")
+            flash(f"Could not verify payment: {response_data.get('message', 'Unknown error')}", "danger")
+            return redirect(url_for('pricing_page'))
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error connecting to Paystack for verification: {e}")
+        flash("Could not connect to payment gateway to verify payment. Please contact support if payment was made.", "danger")
+        return redirect(url_for('pricing_page'))
+    except Exception as e:
+        print(f"Error during payment callback processing: {e}")
+        flash("An unexpected error occurred during payment verification.", "danger")
+        return redirect(url_for('pricing_page'))
 
 # --- NEW Email Verification Route ---
 @app.route('/verify-email/<token>')
