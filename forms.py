@@ -300,4 +300,12 @@ class ResetPasswordForm(FlaskForm):
                                      validators=[DataRequired(), EqualTo('password', message='Passwords must match.')])
     submit = SubmitField('Reset Password')
 
+# --- New Contact Form ---
+class ContactForm(FlaskForm):
+    """Form for user contact inquiries."""
+    name = StringField('What\'s your name?', validators=[DataRequired()])
+    email = EmailField('What\'s your email address?', validators=[DataRequired(), Email()])
+    message = TextAreaField('What\'s your question or message?', validators=[DataRequired(), Length(min=10, max=1000)])
+    submit = SubmitField('Submit')
+
 
