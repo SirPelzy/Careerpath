@@ -3,7 +3,7 @@ import uuid
 import datetime
 from flask_migrate import Migrate
 from werkzeug.utils import secure_filename # To sanitize filenames
-from flask import Flask, render_template, redirect, url_for, flash, request, abort, current_app, session, send_from_directory
+from flask import Flask, render_template, redirect, url_for, flash, request, abort, current_app, session, send_from_directory, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
 from flask_bcrypt import Bcrypt
@@ -943,6 +943,80 @@ def profile():
                            is_homepage=False,
                            body_class='in-app-layout') # Use sidebar navigation
 
+
+# --- Route to Toggle Step Completion Status (AJAX Version) ---
+@app.route('/path/step/<int:step_id>/toggle', methods=['POST'])
+@login_required
+def toggle_step_status(step_id):
+    """Handles AJAX request to mark a step as complete or incomplete."""
+    step = Step.query.get_or_404(step_id)
+
+    # Optional ownership check (if needed)
+    # if step.milestone.career_path_id != current_user.target_career_path_id:
+    #     return jsonify({'success': False, 'message': 'Unauthorized action.'}), 403
+
+    user_status = UserStepStatus.query.filter_by(user_id=current_user.id, step_id=step.id).first()
+    new_status = 'not_started' # Default assumption
+    flash_message = ''
+
+    try:
+        if user_status:
+            if user_status.status == 'completed':
+                user_status.status = 'not_started'
+                user_status.completed_at = None
+                new_status = 'not_started'
+                flash_message = f'Step "{step.name}" marked as not started.'
+            else:
+                user_status.status = 'completed'
+                user_status.completed_at = datetime.datetime.utcnow()
+                new_status = 'completed'
+                flash_message = f'Step "{step.name}" marked as completed!'
+        else:
+            user_status = UserStepStatus(
+                user_id=current_user.id,
+                step_id=step.id,
+                status='completed',
+                completed_at=datetime.datetime.utcnow()
+            )
+            db.session.add(user_status)
+            new_status = 'completed'
+            flash_message = f'Step "{step.name}" marked as completed!'
+
+        db.session.commit()
+
+        # --- Check for milestone completion AFTER commit ---
+        milestone_completed_now = False
+        if new_status == 'completed' and step.milestone:
+             milestone = step.milestone
+             all_milestone_step_ids_query = Step.query.filter_by(milestone_id=milestone.id).with_entities(Step.id)
+             all_milestone_step_ids = {step_id for step_id, in all_milestone_step_ids_query.all()}
+             total_steps_in_milestone = len(all_milestone_step_ids)
+             if total_steps_in_milestone > 0:
+                 completed_statuses_query = UserStepStatus.query.filter(
+                     UserStepStatus.user_id == current_user.id,
+                     UserStepStatus.status == 'completed',
+                     UserStepStatus.step_id.in_(all_milestone_step_ids)
+                 ).with_entities(UserStepStatus.step_id)
+                 completed_count = completed_statuses_query.count() # Use count() query
+                 if completed_count == total_steps_in_milestone:
+                     milestone_completed_now = True
+                     flash_message += f' Milestone "{milestone.name}" also complete!' # Append to message
+
+        # Return JSON instead of redirecting
+        return jsonify({
+            'success': True,
+            'new_status': new_status,
+            'step_id': step.id,
+            'milestone_id': step.milestone_id, # Send milestone ID
+            'message': flash_message,
+            'milestone_completed': milestone_completed_now # Send flag
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating step status via AJAX for user {current_user.id}, step {step_id}: {e}")
+        # Return JSON error
+        return jsonify({'success': False, 'message': 'An error occurred while updating status.'}), 500
 
 # --- NEW CV Download Route ---
 @app.route('/cv-download')
