@@ -17,6 +17,8 @@ from itsdangerous import URLSafeTimedSerializer as Serializer
 import requests # For making API calls
 import random
 import string
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
 
 # --- Define Plan Details ---
 # Prices are in kobo (lowest currency unit for NGN)
@@ -63,6 +65,29 @@ login_manager.login_message_category = 'info'
 db.init_app(app) # Initialize SQLAlchemy with the app context
 
 migrate = Migrate(app, db) # Initialize Flask-Migrate
+
+SENTRY_DSN = os.environ.get('SENTRY_DSN')
+if SENTRY_DSN:
+    try:
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            # Enable Flask integration to catch Flask-specific errors
+            integrations=[FlaskIntegration()],
+            # Set traces_sample_rate to capture performance data.
+            # 1.0 captures 100%; lower this significantly in high-traffic production.
+            traces_sample_rate=1.0,
+            # Set profiles_sample_rate to profile transactions.
+            profiles_sample_rate=1.0,
+            # Set environment based on FLASK_ENV or default to 'development'
+            environment=os.environ.get('FLASK_ENV', 'development')
+        )
+        print("Sentry initialized successfully.")
+    except Exception as e:
+        # Catch errors during Sentry init itself
+        print(f"ERROR: Failed to initialize Sentry: {e}")
+else:
+    print("WARNING: SENTRY_DSN environment variable not set. Sentry reporting disabled.")
+# --- End Sentry Initialization ---
 
 # Initialize Migrate only if import succeeded
 migrate = None
