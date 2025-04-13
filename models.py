@@ -20,7 +20,7 @@ class User(UserMixin, db.Model):
     last_name = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
-     email_verified = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    email_verified = db.Column(db.Boolean, nullable=False, default=False, index=True)
 
     # Onboarding / Profile Fields
     current_role = db.Column(db.String(100), nullable=True)
