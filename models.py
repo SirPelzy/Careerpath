@@ -21,6 +21,10 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
     email_verified = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    # --- << NEW Verification Code Fields >> ---
+    verification_code = db.Column(db.String(6), nullable=True) # Store 4-6 digit code
+    verification_code_expiry = db.Column(db.DateTime, nullable=True)
+    # --- << END Verification Code Fields >> ---
 
     # Onboarding / Profile Fields
     current_role = db.Column(db.String(100), nullable=True)
