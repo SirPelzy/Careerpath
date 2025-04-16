@@ -172,7 +172,8 @@ else:
 # --- Context Processor for Jinja ---
 @app.context_processor
 def inject_now():
-    return {'now': datetime.datetime.utcnow()}
+    # Use datetime directly as it refers to the class now
+    return {'now': datetime.utcnow()} # REMOVED the extra '.datetime'
 
 # --- User Loader for Flask-Login ---
 @login_manager.user_loader
