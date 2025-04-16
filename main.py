@@ -19,6 +19,7 @@ import random
 import string
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
+from flask_mail import Mail, Message
 
 # --- Define Plan Details ---
 # Prices are in kobo (lowest currency unit for NGN)
