@@ -14,7 +14,7 @@ from models import User
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, SubmitField, SelectField, TextAreaField, URLField
-from wtforms.validators import DataRequired, Length, Optional, URL, ValidationError
+from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError, Optional, URL, Regexp
 from wtforms import RadioField, SubmitField
 # Import PortfolioItem model if needed for validation (not strictly needed here)
 # from models import PortfolioItem
