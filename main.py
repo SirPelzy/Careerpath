@@ -56,6 +56,20 @@ app.config['PAYSTACK_PUBLIC_KEY'] = os.environ.get('PAYSTACK_PUBLIC_KEY')
 if not app.config['PAYSTACK_SECRET_KEY'] or not app.config['PAYSTACK_PUBLIC_KEY']:
      print("WARNING: Paystack API keys not configured.")
 
+# --- << NEW: Flask-Mail Configuration for Brevo (Sendinblue) >> ---
+app.config['MAIL_SERVER'] = 'smtp-relay.brevo.com' # Or smtp-relay.sendinblue.com if that works better
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')      # Your Brevo account login email
+app.config['MAIL_PASSWORD'] = os.environ.get('BREVO_SMTP_KEY')     # The SMTP Key generated in Brevo
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER') # Your verified sender email
+
+# Optional: Check if mail settings are present
+if not app.config['MAIL_USERNAME'] or not app.config['MAIL_PASSWORD'] or not app.config['MAIL_DEFAULT_SENDER']:
+    print("WARNING: Email settings (MAIL_USERNAME, BREVO_SMTP_KEY, MAIL_DEFAULT_SENDER) not fully configured in .env")
+# --- << END Flask-Mail Configuration >> ---
+
 # --- Initialize Extensions ---
 csrf = CSRFProtect(app)
 bcrypt = Bcrypt(app)
