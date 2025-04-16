@@ -570,57 +570,39 @@ def register():
             db.session.add(user)
             db.session.commit()
 
-            # --- << NEW: Generate/Store/Send Verification Code >> ---
             try:
-                # --- << TEMPORARY DEBUG: Import timedelta here >> ---
-                from datetime import timedelta
-                print("DEBUG: timedelta imported inside register function.")
-                # --- << END TEMPORARY DEBUG >> ---
-
                 code = str(random.randint(1000, 9999))
-                # This line should now find the timedelta imported just above
-                expiry = datetime.datetime.utcnow() + timedelta(minutes=15) # Or datetime.utcnow() if you fixed inject_now
+                expiry = datetime.utcnow() + timedelta(minutes=15)
                 user.verification_code = code
                 user.verification_code_expiry = expiry
                 db.session.commit()
-                
 
-                # Send code via email
                 email_sent = send_email(
                     to=user.email,
                     subject='Your Careerpath! Verification Code',
-                    template_prefix='email/verify_code', # Use new templates
-                    user=user, # Pass user object if needed by template
-                    code=code # Pass code to template
+                    template_prefix='email/verify_code',
+                    user=user,
+                    code=code
                 )
 
                 if email_sent:
-                     flash('Account created! Please check your email for the verification code.', 'success')
+                    flash('Account created! Please check your email for the verification code.', 'success')
                 else:
-                     flash('Account created, but verification code email could not be sent. Please contact support.', 'warning')
-                     # Consider if user should proceed without email? Maybe not.
+                    flash('Account created, but verification code email could not be sent. Please contact support.', 'warning')
 
-                # Redirect to the code verification page
-                return redirect(url_for('verify_code_entry', email=user.email)) # Pass email
+                return redirect(url_for('verify_code_entry', email=user.email))
 
-            except NameError as ne:
-                 # Catch NameError specifically here for debugging
-                 print(f"ERROR (NameError) generating/sending code: {ne}")
-                 flash('Internal error: Verification component not found.', 'danger')
-                 return redirect(url_for('login'))
             except Exception as e_code:
-                 db.session.rollback()
-                 print(f"Error generating/sending verification code for {user.email}: {e_code}")
-                 flash('Account created, but failed to send verification code. Please contact support.', 'warning')
-                 return redirect(url_for('login'))
-                
-            
+                db.session.rollback()
+                print(f"Error generating/sending verification code for {user.email}: {e_code}")
+                flash('Account created, but failed to send verification code. Please contact support.', 'warning')
+                return redirect(url_for('login'))
+
         except Exception as e:
             db.session.rollback()
             print(f"Error during registration: {e}")
             flash('An error occurred during registration. Please try again.', 'danger')
     return render_template('register.html', title='Register', form=form, is_homepage=False)
-
 
 # --- NEW Initial Code Verification Route ---
 @app.route('/verify-code', methods=['GET', 'POST'])
