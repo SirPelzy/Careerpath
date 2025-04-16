@@ -19,27 +19,66 @@ import random
 import string
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
-from flask_mail import Mail, Message
 
 
-# --- Email Sending Helper ---
+
+# --- NEW Email Sending Helper (using Brevo API) ---
 def send_email(to, subject, template_prefix, **kwargs):
-    """Sends an email using Flask-Mail."""
+    """Sends an email using the Brevo v3 API."""
+    api_key = current_app.config.get('BREVO_API_KEY')
+    sender_email = current_app.config.get('MAIL_DEFAULT_SENDER')
+    sender_name = "Careerpath!" # Or get from config
+
+    if not api_key or not sender_email:
+        print("ERROR: Brevo API Key or Sender Email not configured. Cannot send email.")
+        return False
+
+    # Brevo API v3 endpoint for sending transactional emails
+    url = "https://api.brevo.com/v3/smtp/email"
+
+    headers = {
+        "accept": "application/json",
+        "api-key": api_key,
+        "content-type": "application/json"
+    }
+
+    # Render email bodies using existing templates
     try:
-        msg = Message(
-            subject,
-            sender=current_app.config['MAIL_DEFAULT_SENDER'],
-            recipients=[to]
-        )
-        # Render both text and html bodies
-        msg.body = render_template(template_prefix + '.txt', **kwargs)
-        msg.html = render_template(template_prefix + '.html', **kwargs)
-        mail.send(msg) # Send the email
-        print(f"Email sent successfully to {to} with subject '{subject}'") # Debug log
-        return True
+        html_content = render_template(template_prefix + '.html', **kwargs)
+        text_content = render_template(template_prefix + '.txt', **kwargs)
+    except Exception as e_render:
+        print(f"ERROR rendering email template {template_prefix}: {e_render}")
+        return False
+
+    # Construct the payload according to Brevo API v3 documentation
+    payload = {
+       "sender": {"email": sender_email, "name": sender_name},
+       "to": [{"email": to}], # Assumes sending to one recipient
+       "subject": subject,
+       "htmlContent": html_content,
+       "textContent": text_content
+       # Can add replyTo, tags etc. here if needed
+    }
+
+    try:
+        print(f"DEBUG: Attempting to send email via Brevo API to {to} with subject '{subject}'")
+        response = requests.post(url, headers=headers, json=payload, timeout=20)
+
+        # Check Brevo API response
+        if response.status_code == 201: # 201 Created indicates success for Brevo send
+            print(f"Email sent successfully via Brevo API to {to}. Message ID: {response.json().get('messageId')}")
+            return True
+        else:
+            # Log detailed error from Brevo if possible
+            print(f"ERROR: Brevo API returned status {response.status_code}. Response: {response.text}")
+            return False
+
+    except requests.exceptions.RequestException as e_req:
+        print(f"ERROR: Network error connecting to Brevo API: {e_req}")
+        return False
     except Exception as e:
-        # Log the error thoroughly in production
-        print(f"ERROR sending email to {to} with subject '{subject}': {e}")
+        # Catch other potential errors (e.g., JSON parsing if Brevo changes response)
+        print(f"ERROR sending email via Brevo API to {to}: {e}")
         return False
 
 # --- Define Plan Details ---
@@ -63,7 +102,6 @@ except ImportError as e:
 load_dotenv()
 
 app = Flask(__name__)
-mail = Mail(app)
 
 # --- Configuration ---
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secure-fallback-key-34567') # Use env var ideally
@@ -79,19 +117,11 @@ app.config['PAYSTACK_PUBLIC_KEY'] = os.environ.get('PAYSTACK_PUBLIC_KEY')
 if not app.config['PAYSTACK_SECRET_KEY'] or not app.config['PAYSTACK_PUBLIC_KEY']:
      print("WARNING: Paystack API keys not configured.")
 
-# --- << NEW: Flask-Mail Configuration for Brevo (Sendinblue) >> ---
-app.config['MAIL_SERVER'] = 'smtp-relay.brevo.com' # Or smtp-relay.sendinblue.com if that works better
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USE_SSL'] = False
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')      # Your Brevo account login email
-app.config['MAIL_PASSWORD'] = os.environ.get('BREVO_SMTP_KEY')     # The SMTP Key generated in Brevo
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER') # Your verified sender email
+app.config['BREVO_API_KEY'] = os.environ.get('BREVO_API_KEY')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER') # Still need sender
 
-# Optional: Check if mail settings are present
-if not app.config['MAIL_USERNAME'] or not app.config['MAIL_PASSWORD'] or not app.config['MAIL_DEFAULT_SENDER']:
-    print("WARNING: Email settings (MAIL_USERNAME, BREVO_SMTP_KEY, MAIL_DEFAULT_SENDER) not fully configured in .env")
-# --- << END Flask-Mail Configuration >> ---
+if not app.config['BREVO_API_KEY'] or not app.config['MAIL_DEFAULT_SENDER']:
+    print("WARNING: Brevo API Key or Mail Sender not configured.")
 
 # --- Initialize Extensions ---
 csrf = CSRFProtect(app)
