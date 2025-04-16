@@ -569,38 +569,98 @@ def register():
             db.session.add(user)
             db.session.commit()
 
+            # --- << NEW: Generate/Store/Send Verification Code >> ---
             try:
-                s = Serializer(current_app.config['SECRET_KEY'])
-                token_salt = 'email-confirm-salt'
-                token = s.dumps(user.id, salt=token_salt)
-                verify_url = url_for('verify_token', token=token, _external=True)
+                code = str(random.randint(1000, 9999)) # Generate 4-digit code
+                expiry = datetime.datetime.utcnow() + timedelta(minutes=15) # 15 min expiry
+                user.verification_code = code
+                user.verification_code_expiry = expiry
+                db.session.commit() # Save code and expiry to user
 
+                # Send code via email
                 email_sent = send_email(
                     to=user.email,
-                    subject='Confirm Your Email Address - Careerpath!',
-                    template_prefix='email/confirm_email', # Base name for txt/html templates
-                    user=user, # Pass context needed by template
-                    verify_url=verify_url
+                    subject='Your Careerpath! Verification Code',
+                    template_prefix='email/verify_code', # Use new templates
+                    user=user, # Pass user object if needed by template
+                    code=code # Pass code to template
                 )
 
                 if email_sent:
-                     flash('Your account has been created! Please check your email to verify your account.', 'success')
+                     flash('Account created! Please check your email for the verification code.', 'success')
                 else:
-                     flash('Account created, but verification email could not be sent. Please contact support.', 'warning')
+                     flash('Account created, but verification code email could not be sent. Please contact support.', 'warning')
+                     # Consider if user should proceed without email? Maybe not.
 
-            except Exception as e_token:
-                 print(f"Error generating verification token or sending email for {user.email}: {e_token}")
-                 flash('Account created, but failed to send verification email. Please contact support.', 'warning')
-            # --- << END Send Verification Email >> ---    
+                # Redirect to the code verification page
+                return redirect(url_for('verify_code_entry', email=user.email)) # Pass email
 
-            return redirect(url_for('login'))            
+            except Exception as e_code:
+                 db.session.rollback() # Rollback code saving if email fails? Or just log?
+                 print(f"Error generating/sending verification code for {user.email}: {e_code}")
+                 flash('Account created, but failed to send verification code. Please contact support.', 'warning')
+                 return redirect(url_for('login')) # Fallback redirect
+            # --- << END Generate/Store/Send Code >> --- 
                 
             
         except Exception as e:
             db.session.rollback()
             print(f"Error during registration: {e}")
             flash('An error occurred during registration. Please try again.', 'danger')
-    return render_template('register.html', title='Register', form=form, is_homepage=True)
+    return render_template('register.html', title='Register', form=form, is_homepage=False)
+
+
+# --- NEW Initial Code Verification Route ---
+@app.route('/verify-code', methods=['GET', 'POST'])
+def verify_code_entry():
+    """Handles the initial email verification code entry after registration."""
+    if current_user.is_authenticated: # If somehow logged in, redirect away
+        return redirect(url_for('dashboard'))
+
+    form = VerifyCodeForm()
+    email = request.args.get('email') # Get email from query param passed by register route
+
+    if form.validate_on_submit():
+        if not email: # If email wasn't passed correctly
+             flash("Could not identify user. Please try logging in.", "warning")
+             return redirect(url_for('login'))
+
+        user = User.query.filter_by(email=email).first()
+        submitted_code = form.code.data
+
+        if not user:
+            flash("User not found. Please register or check the email address.", "danger")
+            # Don't redisplay form, redirect to login/register
+            return redirect(url_for('login'))
+
+        # Check code and expiry
+        if user.verification_code == submitted_code and \
+           user.verification_code_expiry and \
+           user.verification_code_expiry > datetime.datetime.utcnow():
+            try:
+                # Success! Verify email and clear code/expiry
+                user.email_verified = True
+                user.verification_code = None
+                user.verification_code_expiry = None
+                db.session.commit()
+                flash("Email verified successfully! Please log in.", "success")
+                return redirect(url_for('login'))
+            except Exception as e:
+                 db.session.rollback()
+                 print(f"Error verifying email for {email}: {e}")
+                 flash("An error occurred during verification. Please try again.", 'danger')
+        else:
+            # Code mismatch or expired
+            flash("Invalid or expired verification code.", "danger")
+            # Fall through to re-render form
+
+    # Render form on GET or if POST fails
+    # Pass email to template maybe to display "Verifying for email..."
+    return render_template('verify_code.html',
+                            title="Verify Your Email",
+                            form=form,
+                            email=email, # Pass email for context
+                            is_homepage=False) # Use dark navbar for consistency? Or light? Let's use dark.
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
