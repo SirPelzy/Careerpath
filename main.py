@@ -42,6 +42,7 @@ except ImportError as e:
 load_dotenv()
 
 app = Flask(__name__)
+mail = Mail(app)
 
 # --- Configuration ---
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secure-fallback-key-34567') # Use env var ideally
