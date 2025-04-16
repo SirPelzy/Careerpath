@@ -572,11 +572,18 @@ def register():
 
             # --- << NEW: Generate/Store/Send Verification Code >> ---
             try:
-                code = str(random.randint(1000, 9999)) # Generate 4-digit code
-                expiry = datetime.datetime.utcnow() + timedelta(minutes=15) # 15 min expiry
+                # --- << TEMPORARY DEBUG: Import timedelta here >> ---
+                from datetime import timedelta
+                print("DEBUG: timedelta imported inside register function.")
+                # --- << END TEMPORARY DEBUG >> ---
+
+                code = str(random.randint(1000, 9999))
+                # This line should now find the timedelta imported just above
+                expiry = datetime.datetime.utcnow() + timedelta(minutes=15) # Or datetime.utcnow() if you fixed inject_now
                 user.verification_code = code
                 user.verification_code_expiry = expiry
-                db.session.commit() # Save code and expiry to user
+                db.session.commit()
+                
 
                 # Send code via email
                 email_sent = send_email(
@@ -596,12 +603,16 @@ def register():
                 # Redirect to the code verification page
                 return redirect(url_for('verify_code_entry', email=user.email)) # Pass email
 
+            except NameError as ne:
+                 # Catch NameError specifically here for debugging
+                 print(f"ERROR (NameError) generating/sending code: {ne}")
+                 flash('Internal error: Verification component not found.', 'danger')
+                 return redirect(url_for('login'))
             except Exception as e_code:
-                 db.session.rollback() # Rollback code saving if email fails? Or just log?
+                 db.session.rollback()
                  print(f"Error generating/sending verification code for {user.email}: {e_code}")
                  flash('Account created, but failed to send verification code. Please contact support.', 'warning')
-                 return redirect(url_for('login')) # Fallback redirect
-            # --- << END Generate/Store/Send Code >> --- 
+                 return redirect(url_for('login'))
                 
             
         except Exception as e:
