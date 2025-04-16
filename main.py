@@ -21,6 +21,27 @@ import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 from flask_mail import Mail, Message
 
+
+# --- Email Sending Helper ---
+def send_email(to, subject, template_prefix, **kwargs):
+    """Sends an email using Flask-Mail."""
+    try:
+        msg = Message(
+            subject,
+            sender=current_app.config['MAIL_DEFAULT_SENDER'],
+            recipients=[to]
+        )
+        # Render both text and html bodies
+        msg.body = render_template(template_prefix + '.txt', **kwargs)
+        msg.html = render_template(template_prefix + '.html', **kwargs)
+        mail.send(msg) # Send the email
+        print(f"Email sent successfully to {to} with subject '{subject}'") # Debug log
+        return True
+    except Exception as e:
+        # Log the error thoroughly in production
+        print(f"ERROR sending email to {to} with subject '{subject}': {e}")
+        return False
+
 # --- Define Plan Details ---
 # Prices are in kobo (lowest currency unit for NGN)
 PLANS = {
@@ -520,26 +541,30 @@ def register():
 
             try:
                 s = Serializer(current_app.config['SECRET_KEY'])
-                token_salt = 'email-confirm-salt' # Different salt
+                token_salt = 'email-confirm-salt'
                 token = s.dumps(user.id, salt=token_salt)
                 verify_url = url_for('verify_token', token=token, _external=True)
 
-                # Store in session for DEV MODE modal
-                session['show_verify_modal'] = True
-                session['verify_url'] = verify_url
-                print(f"DEBUG: Stored verify URL in session for {user.email}")
+                email_sent = send_email(
+                    to=user.email,
+                    subject='Confirm Your Email Address - Careerpath!',
+                    template_prefix='email/confirm_email', # Base name for txt/html templates
+                    user=user, # Pass context needed by template
+                    verify_url=verify_url
+                )
 
-                # Flash message indicating verification needed (and showing link for dev)
-                flash('Your account has been created! Please check the pop-up on the login page to verify your email (DEV MODE).', 'success')
+                if email_sent:
+                     flash('Your account has been created! Please check your email to verify your account.', 'success')
+                else:
+                     flash('Account created, but verification email could not be sent. Please contact support.', 'warning')
 
-                # --- PRODUCTION Email code would go here ---
-                # msg = Message(...) send email with verify_url ...
-                # --- End Production ---
             except Exception as e_token:
-                 # Log error if token generation fails, but let user log in
-                 print(f"Error generating verification token for {user.email}: {e_token}")
-                 flash('Your account was created, but verification link generation failed. Please contact support or try resetting password later.', 'warning')
-            return redirect(url_for('login'))
+                 print(f"Error generating verification token or sending email for {user.email}: {e_token}")
+                 flash('Account created, but failed to send verification email. Please contact support.', 'warning')
+            # --- << END Send Verification Email >> ---    
+
+            return redirect(url_for('login'))            
+                
             
         except Exception as e:
             db.session.rollback()
@@ -552,12 +577,7 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     form = LoginForm()
-    # --- Check for reset modal info from session on GET request ---
-    show_modal = session.pop('show_reset_modal', False) # Get value and remove from session
-    reset_url = session.pop('reset_url', None) # Get value and remove from session
-    show_verify_modal = session.pop('show_verify_modal', False) # <-- New Check
-    verify_url = session.pop('verify_url', None)
-    # --- End Check ---
+    
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data.lower()).first()
         if user and user.check_password(form.password.data):
@@ -579,7 +599,7 @@ def login():
                  return redirect(next_page or url_for('dashboard'))
         else:
             flash('Login Unsuccessful. Please check email and password.', 'danger')
-    return render_template('login.html', title='Login', form=form, is_homepage=True, show_reset_modal=show_modal, reset_url=reset_url, show_verify_modal=show_verify_modal, verify_url=verify_url)
+    return render_template('login.html', title='Login', form=form, is_homepage=True)
 
 @app.route('/logout')
 @login_required
@@ -1243,39 +1263,36 @@ def request_reset():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data.lower()).first()
         # --- MODIFIED Logic ---
-        reset_url_for_dev = None # Variable to potentially store URL for session
         if user:
-            # Generate Token
-            s = Serializer(current_app.config['SECRET_KEY'])
-            token_salt = 'password-reset-salt'
-            token = s.dumps(user.id, salt=token_salt)
-            reset_url = url_for('reset_token', token=token, _external=True) # Generate full URL
+        # --- << MODIFIED: Send Reset Email >> ---
+            try:
+                s = Serializer(current_app.config['SECRET_KEY'])
+                token_salt = 'password-reset-salt'
+                token = s.dumps(user.id, salt=token_salt)
+                reset_url = url_for('reset_token', token=token, _external=True)
 
-            # Store URL in session for DEV MODE pop-up
-            reset_url_for_dev = reset_url
-            session['show_reset_modal'] = True
-            session['reset_url'] = reset_url_for_dev
-            print(f"DEBUG: Stored reset URL in session for {user.email}") # Optional debug print
+                email_sent = send_email(
+                    to=user.email,
+                    subject='Password Reset Request - Careerpath!',
+                    template_prefix='email/reset_password',
+                    user=user,
+                    reset_url=reset_url
+                )
 
-            # --- !!! PRODUCTION: Send Email (Requires Flask-Mail setup) !!! ---
-            # msg = Message('Password Reset Request',
-            #               sender='noreply@yourdomain.com',
-            #               recipients=[user.email])
-            # msg.body = f'''To reset your password, visit the following link:
-            # {reset_url}
+                if email_sent:
+                    flash('An email has been sent with instructions to reset your password.', 'info')
+                else:
+                    flash('Could not send password reset email. Please try again later or contact support.', 'danger')
 
-            # If you did not make this request then simply ignore this email and no changes will be made.
-            # This link will expire in 30 minutes.
-            # '''
-            # mail.send(msg) # Assumes 'mail = Mail(app)' is configured
-            # flash('An email has been sent with instructions to reset your password.', 'info')
-            # --- !!! END PRODUCTION --- !!!
-
+            except Exception as e_token:
+                 print(f"Error generating reset token or sending email for {user.email}: {e_token}")
+                 flash('An error occurred processing your request. Please try again.', 'danger')
+        # --- << END Send Reset Email >> ---
         else:
-             # Still flash generic message even if user not found for security
+         # Still flash generic message even if user not found
              flash('If an account exists for that email, instructions to reset your password have been sent.', 'info')
 
-        return redirect(url_for('login')) # Redirect to login after request
+        return redirect(url_for('login')) # Redirect to login
 
     # Determine layout based on authentication status
     is_homepage_layout = not current_user.is_authenticated
