@@ -309,3 +309,18 @@ class ContactForm(FlaskForm):
     submit = SubmitField('Submit')
 
 
+# --- New Verification Code Form ---
+class VerifyCodeForm(FlaskForm):
+    """Form for entering the email verification code."""
+    code = StringField('Verification Code',
+                       validators=[
+                           DataRequired(),
+                           Length(min=4, max=6, message='Code must be 4-6 digits.'),
+                           Regexp('^[0-9]*$', message='Code must contain only digits.')
+                       ],
+                       render_kw={"placeholder": "Enter 4-digit code", "autocomplete": "one-time-code", "inputmode": "numeric", "pattern": "[0-9]*"})
+    # Optional: Hidden field for email if needed, but can get from query param/session
+    # email = HiddenField()
+    submit = SubmitField('Verify Email')
+
+
