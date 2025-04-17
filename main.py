@@ -1220,7 +1220,7 @@ def toggle_step_status(step_id):
                 flash_message = f'Step "{step.name}" marked as not started.'
             else:
                 user_status.status = 'completed'
-                user_status.completed_at = datetime.datetime.utcnow()
+                user_status.completed_at = datetime.utcnow()
                 new_status = 'completed'
                 flash_message = f'Step "{step.name}" marked as completed!'
         else:
@@ -1228,7 +1228,7 @@ def toggle_step_status(step_id):
                 user_id=current_user.id,
                 step_id=step.id,
                 status='completed',
-                completed_at=datetime.datetime.utcnow()
+                completed_at=datetime.utcnow()
             )
             db.session.add(user_status)
             new_status = 'completed'
