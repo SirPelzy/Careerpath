@@ -91,4 +91,321 @@
                 <ul class="list-group">
                   {% for step in milestone.steps %} {# Access steps via relationship #}
                     <li class="list-group-item d-flex justify-content-between align-items-start">
-                      {# Step Details #
+                      {# Step Details #}
+                      <div class="ms-2 me-auto">
+                        <div class="fw-bold">{{ step.sequence }}. {{ step.name }}</div>
+                        {% if step.description %}<small>{{ step.description }}</small><br>{% endif %}
+                        {% if step.estimated_time_minutes %}
+                          <small class="text-muted">Est. Time: {{ (step.estimated_time_minutes / 60)|round(1) if step.estimated_time_minutes >= 60 else step.estimated_time_minutes }} {{ 'hours' if step.estimated_time_minutes >= 60 else 'minutes' }}</small><br>
+                        {% endif %}
+                        {# Resources for the step #}
+                        {% if step.resources.count() > 0 %}
+                          <small>Resources:</small>
+                          <ul>
+                            {% for resource in step.resources %}
+                              <li>
+                                {# Recommendation Badge #}
+                                {% if resource.id in recommended_resource_ids %}
+                                  <span class="badge bg-warning text-dark me-1 align-middle" title="Recommended based on your profile"><i class="bi bi-star-fill"></i></span>
+                                {% endif %}
+                                {# End Recommendation Badge #}
+                                <a href="{{ resource.url }}" target="_blank" rel="noopener noreferrer">
+                                  {{ resource.name }} {% if resource.resource_type %}({{ resource.resource_type }}){% endif %}
+                                </a>
+                              </li>
+                            {% endfor %}
+                          </ul>
+                        {% endif %} {# End if step.resources #}
+
+                        {# Conditional Add Proof Link #}
+                        {% set proof_relevant_types = ['Project', 'Certificate', 'Assessment', 'Internship'] %} {# Adjust as needed #}
+                        {% set show_proof_link = False %}
+                        {% if step.step_type %} {# Check if step_type has a value #}
+                          {% for keyword in proof_relevant_types %}
+                            {% if keyword == step.step_type %} {# Use direct comparison #}
+                              {% set show_proof_link = True %}
+                            {% endif %}
+                          {% endfor %}
+                        {% endif %}
+
+                        {% if show_proof_link %}
+                          <div class="mt-2">
+                              <a href="{{ url_for('add_portfolio_item', step_id=step.id) }}" class="btn btn-sm btn-outline-secondary py-0" title="Add proof or link for this step">
+                                  <small><i class="bi bi-paperclip me-1"></i>Link/Upload Proof</small>
+                              </a>
+                          </div>
+                        {% endif %}
+                        {# End Conditional Add Proof Link #}
+
+                      </div> {# End Step Details Div #}
+
+                      {# Step Completion Status/Button (with ID on outer span) #}
+                      <span id="step-{{ step.id }}-status-container" class="badge bg-light text-dark ms-2 align-self-center">
+                        {% if step.id in completed_step_ids %}
+                          <span class="text-success fw-bold">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-circle-fill me-1" viewBox="0 0 16 16" style="vertical-align: -0.125em;">
+                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                              </svg>Completed
+                          </span>
+                        {% else %}
+                          {# Add class and data attributes to form #}
+                          <form method="POST"
+                                action="{{ url_for('toggle_step_status', step_id=step.id) }}"
+                                class="d-inline toggle-step-form"
+                                data-step-id="{{ step.id }}"
+                                data-milestone-id="{{ milestone.id }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-sm btn-outline-success py-0" title="Mark as complete">
+                               <small>Done?</small>
+                            </button>
+                          </form>
+                        {% endif %}
+                      </span> {# End badge/status container #}
+                    </li> {# End list item #}
+                  {% else %}
+                    <li class="list-group-item">No steps defined for this milestone yet.</li>
+                  {% endfor %}
+                </ul> {# End list group #}
+              </div> {# End accordion body #}
+            </div> {# End collapse #}
+          </div> {# End accordion item #}
+        {% endfor %}
+      {% else %}
+        <p>No milestones defined for this career path yet.</p>
+      {% endif %}
+    </div> {# End accordion #}
+
+  {# --- If no path selected --- #}
+  {% else %}
+    <p>You haven't selected a target career path yet. Please complete your profile.</p>
+    <a href="{{ url_for('onboarding') }}" class="btn btn-primary">Complete Profile</a>
+  {% endif %}
+
+{% endblock %}
+
+
+{# --- Scripts Block for AJAX with Progress Updates --- #}
+{% block scripts %}
+{{ super() }} {# Include scripts from base template if any #}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // --- Toast Initialization & Helper Function ---
+    const toastLiveElement = document.getElementById('liveToast');
+    const toastTitleElement = document.getElementById('toastTitle');
+    const toastBodyElement = document.getElementById('toastBody');
+    let liveToast = null;
+    if (toastLiveElement) {
+        liveToast = new bootstrap.Toast(toastLiveElement, { delay: 4000 }); // 4 second delay
+    }
+
+    function showToast(message, title = 'Update', isError = false) {
+        if (liveToast && toastBodyElement && toastTitleElement) {
+             toastBodyElement.textContent = message;
+             toastTitleElement.textContent = title;
+             const header = toastLiveElement.querySelector('.toast-header');
+             header.classList.remove('bg-danger', 'bg-success', 'text-white', 'bg-light'); // Clear previous colors
+             if (isError) {
+                header.classList.add('bg-danger', 'text-white');
+             } else {
+                 header.classList.add('bg-light'); // Use light bg for success/info
+             }
+             liveToast.show();
+        } else {
+            console.error("Toast elements not found!");
+            alert((isError ? "Error: " : "") + message); // Fallback alert
+        }
+    }
+    // --- End Toast ---
+
+    // --- Progress Update Helper Functions ---
+    function updateOverallProgress(progressData) {
+        const progressBar = document.getElementById('overall-progress-bar');
+        const progressText = document.getElementById('overall-progress-text');
+        const progressBarContainer = document.getElementById('overall-progress-bar-container');
+
+        if (progressBar && progressText && progressData && typeof progressData.percent !== 'undefined') {
+            const percent = progressData.percent;
+            progressBar.style.width = percent + '%';
+            progressBar.setAttribute('aria-valuenow', percent);
+            progressBar.textContent = percent + '%';
+            progressBar.className = `progress-bar progress-bar-striped progress-bar-animated ${percent === 100 ? 'bg-success' : 'bg-primary'}`; // Changed to primary, success when 100
+             if (progressBarContainer) {
+                 progressBarContainer.setAttribute('title', percent + '% Complete');
+             }
+            // Use innerHTML carefully, ensure data is safe if coming from user input elsewhere
+            progressText.innerHTML = `<strong class="fs-5">${progressData.completed}</strong> / ${progressData.total} Steps Completed`;
+        } else {
+             console.warn("Could not update overall progress elements or data missing.");
+        }
+    }
+
+    function updateMilestoneProgress(milestoneId, progressData) {
+        const progressTextSpan = document.getElementById(`milestone-${milestoneId}-progress-text`);
+        const progressBar = document.getElementById(`milestone-${milestoneId}-progress-bar`);
+        const progressBarContainer = document.getElementById(`milestone-${milestoneId}-progress-bar-container`);
+        const accordionButton = document.getElementById(`heading${milestoneId}`)?.querySelector('button');
+
+        if (progressData && typeof progressData.percent !== 'undefined') {
+             const percent = progressData.percent;
+            // Update Text Span
+            if (progressTextSpan) {
+                if (percent === 100 && progressData.total > 0) {
+                    progressTextSpan.className = 'badge bg-success ms-2';
+                    progressTextSpan.innerHTML = `
+                        <i class="bi bi-check-circle-fill me-1"></i>Completed`;
+                    if (accordionButton) { // Style header button too
+                         accordionButton.classList.add('bg-success-subtle', 'text-success');
+                         accordionButton.classList.remove('collapsed'); // Maybe keep it open? Or let user decide.
+                    }
+
+                } else { // Includes case where total is 0 or percentage < 100
+                    progressTextSpan.className = 'badge bg-light text-dark ms-2';
+                    progressTextSpan.innerHTML = `${progressData.completed} / ${progressData.total} Done (${percent}%)`;
+                     if (accordionButton) { // Remove completed style if toggled back
+                          accordionButton.classList.remove('bg-success-subtle', 'text-success');
+                          // Ensure 'collapsed' is present if not complete? Bootstrap handles this on click usually.
+                     }
+                }
+            }
+            // Update Progress Bar
+            if (progressBar) {
+                 progressBar.style.width = percent + '%';
+                 progressBar.setAttribute('aria-valuenow', percent);
+                 progressBar.className = `progress-bar ${percent === 100 ? 'bg-success' : 'bg-primary'}`;
+                 if(progressBarContainer) progressBarContainer.setAttribute('title', percent + '% Complete');
+            }
+        } else if (progressTextSpan) { // Handle case where progress might be explicitly {total: 0} or null
+             progressTextSpan.className = 'badge bg-light text-dark ms-2';
+             progressTextSpan.innerHTML = `0 / 0 Done`;
+             if (accordionButton) accordionButton.classList.remove('bg-success-subtle', 'text-success');
+             if (progressBar) { progressBar.style.width = '0%'; progressBar.setAttribute('aria-valuenow', 0); progressBar.className = 'progress-bar bg-primary';}
+             if (progressBarContainer) progressBarContainer.setAttribute('title', '0% Complete');
+        } else {
+             console.warn(`Could not find progress elements for milestone ${milestoneId}`);
+        }
+    }
+    // --- End Progress Update Helpers ---
+
+
+    // --- AJAX Step Toggle Logic ---
+    const dashboardAccordion = document.getElementById('milestonesAccordion');
+
+    if (dashboardAccordion) {
+        dashboardAccordion.addEventListener('submit', function(event) {
+            // Check if the submitted element is a toggle form
+            if (event.target.classList.contains('toggle-step-form')) {
+                event.preventDefault(); // Stop normal form submission
+
+                const form = event.target;
+                const url = form.action;
+                const stepId = form.dataset.stepId;
+                const milestoneId = form.dataset.milestoneId;
+                const csrfTokenInput = form.querySelector('input[name="csrf_token"]');
+                const csrfToken = csrfTokenInput ? csrfTokenInput.value : null;
+                const statusContainer = document.getElementById(`step-${stepId}-status-container`); // Target the outer span
+
+                if (!statusContainer) {
+                    console.error(`Could not find status container for step ${stepId}`);
+                    return; // Stop if container not found
+                }
+                 if (!csrfToken) {
+                    console.error(`CSRF token not found for step ${stepId} form.`);
+                    showToast('Could not submit request. Security token missing.', 'Error', true);
+                    return; // Stop if token missing
+                }
+
+
+                const button = form.querySelector('button');
+                button.disabled = true;
+                button.querySelector('small').textContent = '...';
+
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken, // Send CSRF token in header
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(response => {
+                    // Check if response is ok AND content type is json before parsing
+                    if (!response.ok) {
+                         // Try to get error message from backend if JSON, otherwise use status text
+                         return response.json().catch(() => null).then(errData => {
+                            throw new Error(errData?.message || `HTTP error! status: ${response.status} ${response.statusText}`);
+                         });
+                    }
+                    // Check content type before parsing
+                    const contentType = response.headers.get("content-type");
+                    if (contentType && contentType.indexOf("application/json") !== -1) {
+                        return response.json();
+                    } else {
+                        throw new TypeError("Received non-JSON response from server");
+                    }
+                })
+                .then(data => {
+                    if (data.success) {
+                        showToast(data.message, 'Update Success'); // Show success message from backend
+
+                        // Update the UI for this specific step status container
+                        if (data.new_status === 'completed') {
+                             statusContainer.innerHTML = `
+                                <span class="text-success fw-bold">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-circle-fill me-1" viewBox="0 0 16 16" style="vertical-align: -0.125em;">
+                                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                                    </svg>Completed
+                                </span>`;
+                        } else { // Toggled back to 'not_started'
+                            // Re-insert the form
+                             statusContainer.innerHTML = `
+                                <form method="POST" action="${url}" class="d-inline toggle-step-form" data-step-id="${stepId}" data-milestone-id="${milestoneId}">
+                                    <input type="hidden" name="csrf_token" value="${csrfToken}"/>
+                                    <button type="submit" class="btn btn-sm btn-outline-success py-0" title="Mark as complete">
+                                        <small>Done?</small>
+                                    </button>
+                                </form>`;
+                        }
+
+                        // Update Progress Displays using data from response
+                        if (data.milestone_progress && data.milestone_id) {
+                            updateMilestoneProgress(data.milestone_id, data.milestone_progress);
+                        } else {
+                             console.warn("Milestone progress data missing in response for milestone " + data.milestone_id);
+                        }
+                        if (data.overall_progress) {
+                            updateOverallProgress(data.overall_progress);
+                        } else {
+                             console.warn("Overall progress data missing in response.");
+                        }
+
+                    } else { // Backend returned success: false
+                        showToast(data.message || 'An unknown error occurred.', 'Update Failed', true);
+                         // Re-enable button only if the form still exists
+                         const currentForm = statusContainer.querySelector('.toggle-step-form');
+                         if (currentForm) {
+                             const currentButton = currentForm.querySelector('button');
+                             currentButton.disabled = false;
+                             currentButton.querySelector('small').textContent = 'Done?';
+                         }
+                    }
+                })
+                .catch(error => { // Network or JSON parsing error
+                    console.error('Fetch/Processing Error:', error);
+                    showToast(error.message || 'Could not process request. Please try again.', 'Error', true);
+                    // Re-enable button only if the form still exists
+                     const currentForm = statusContainer.querySelector('.toggle-step-form');
+                     if (currentForm) {
+                         const currentButton = currentForm.querySelector('button');
+                         currentButton.disabled = false;
+                         currentButton.querySelector('small').textContent = 'Done?';
+                     }
+                });
+            } // end if target is toggle form
+        }); // end event listener
+    } // end if dashboardAccordion
+
+}); // end DOMContentLoaded
+</script>
+{% endblock %}
+{# --- End Scripts Block --- #}
