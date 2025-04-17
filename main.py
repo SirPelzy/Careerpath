@@ -630,7 +630,7 @@ def verify_code_entry():
         # Check code and expiry
         if user.verification_code == submitted_code and \
            user.verification_code_expiry and \
-           user.verification_code_expiry > datetime.datetime.utcnow():
+           user.verification_code_expiry > datetime.utcnow():
             try:
                 # Success! Verify email and clear code/expiry
                 user.email_verified = True
