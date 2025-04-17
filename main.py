@@ -619,17 +619,50 @@ def login():
                 db.session.rollback()
                 print(f"Error updating last_login: {e}")
 
-            next_page = request.args.get('next')
-            if next_page and not (next_page.startswith('/') or next_page.startswith(request.host_url)):
-                next_page = None
-            flash('Login Successful!', 'success')
-            if not user.onboarding_complete:
-                return redirect(url_for('onboarding'))
+            # --- << NEW: Check if email verified AFTER login >> ---
+            if not user.email_verified:
+                try:
+                    # Generate and send a NEW code
+                    code = str(random.randint(1000, 9999))
+                    expiry = datetime.utcnow() + timedelta(minutes=15) # Use timedelta here
+                    user.verification_code = code
+                    user.verification_code_expiry = expiry
+                    db.session.commit() # Save new code/expiry
+
+                    email_sent = send_email(
+                        to=user.email,
+                        subject='Verify Your Email for Careerpath!',
+                        template_prefix='email/verify_code', # Reuse code email template
+                        user=user,
+                        code=code
+                    )
+                    if email_sent:
+                        flash('Login successful, but please verify your email to continue. A new code has been sent.', 'warning')
+                    else:
+                         flash('Login successful, but email verification is required and we failed to send a new code. Please contact support.', 'danger')
+
+                except Exception as e_verify:
+                    db.session.rollback()
+                    print(f"Error sending verification code during login for {user.email}: {e_verify}")
+                    flash('Login successful, but there was an error initiating email verification.', 'danger')
+
+                # Redirect to the required verification page
+                return redirect(url_for('verify_code_required'))
+            # --- << END Verification Check >> ---
             else:
-                return redirect(next_page or url_for('dashboard'))
+                # Email IS verified, proceed as normal
+                flash('Login Successful!', 'success')
+                next_page = request.args.get('next')
+                if next_page and not (next_page.startswith('/') or next_page.startswith(request.host_url)):
+                     next_page = None
+                if not user.onboarding_complete:
+                     return redirect(url_for('onboarding'))
+                else:
+                     return redirect(next_page or url_for('dashboard'))
         else:
             flash('Login Unsuccessful. Please check email and password.', 'danger')
-    return render_template('login.html', title='Login', form=form, is_homepage=True)
+    # If GET or form invalid
+    return render_template('login.html', title='Login', form=form, is_homepage=False) # Use dark navbar
 
 
 # --- NEW Logged-In Code Verification Route ---
