@@ -11,7 +11,7 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, curren
 from dotenv import load_dotenv
 from sqlalchemy.orm import selectinload
 from models import db, User, CareerPath, Milestone, Step, Resource, UserStepStatus, PortfolioItem
-from forms import RegistrationForm, LoginForm, OnboardingForm, PortfolioItemForm, EditProfileForm, RecommendationTestForm, ContactForm
+from forms import RegistrationForm, LoginForm, OnboardingForm, PortfolioItemForm, EditProfileForm, RecommendationTestForm, ContactForm, VerifyCodeForm
 from forms import RequestResetForm, ResetPasswordForm
 from itsdangerous import URLSafeTimedSerializer as Serializer
 import requests # For making API calls
