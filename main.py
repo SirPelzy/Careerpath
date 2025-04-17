@@ -631,6 +631,54 @@ def login():
             flash('Login Unsuccessful. Please check email and password.', 'danger')
     return render_template('login.html', title='Login', form=form, is_homepage=True)
 
+
+# --- NEW Logged-In Code Verification Route ---
+@app.route('/verify-code-required', methods=['GET', 'POST'])
+@login_required # User must be logged in to reach here
+def verify_code_required():
+    """Handles verification code entry when required after login."""
+
+    # Redirect if already verified (shouldn't happen if logic is right, but safe check)
+    if current_user.email_verified:
+        return redirect(url_for('dashboard'))
+
+    form = VerifyCodeForm()
+
+    if form.validate_on_submit():
+        submitted_code = form.code.data
+        # Check code against the logged-in user's record
+        if current_user.verification_code == submitted_code and \
+           current_user.verification_code_expiry and \
+           current_user.verification_code_expiry > datetime.utcnow():
+            try:
+                # Success! Verify email and clear code/expiry
+                current_user.email_verified = True
+                current_user.verification_code = None
+                current_user.verification_code_expiry = None
+                db.session.commit()
+                flash("Email verified successfully! Welcome to your dashboard.", "success")
+                # Redirect to dashboard (or originally intended page?)
+                # For simplicity, redirect to dashboard for now.
+                return redirect(url_for('dashboard'))
+            except Exception as e:
+                 db.session.rollback()
+                 print(f"Error verifying email post-login for {current_user.email}: {e}")
+                 flash("An error occurred during verification. Please try again.", 'danger')
+        else:
+            # Code mismatch or expired
+            flash("Invalid or expired verification code. A new code may have been sent if you reloaded.", "danger")
+            # Re-render the same page with error
+            return redirect(url_for('verify_code_required')) # Redirect GET to potentially show new code message
+
+    # GET request: Show the verification form
+    # Optionally resend code if user lands here via GET? Or require login attempt again?
+    # For now, just show form. User might need to trigger login again if code expires.
+    return render_template('verify_code_required.html',
+                            title="Verify Email to Continue",
+                            form=form,
+                            is_homepage=False, # Use in-app layout
+                            body_class='in-app-layout')
+
 @app.route('/logout')
 @login_required
 def logout():
