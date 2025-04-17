@@ -18,17 +18,21 @@
         <h4>Overall Journey Progress</h4>
       </div>
       <div class="col-md-8 mb-3 mb-md-0">
-        <div class="progress" style="height: 25px;" title="{{ overall_percent_complete }}% Complete">
-          <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: {{ overall_percent_complete }}%;" aria-valuenow="{{ overall_percent_complete }}" aria-valuemin="0" aria-valuemax="100">{{ overall_percent_complete }}%</div>
+        {# --- ID added to container for easier title update --- #}
+        <div id="overall-progress-bar-container" class="progress" style="height: 25px;" title="{{ overall_percent_complete }}% Complete">
+           {# --- ID added to bar for updates --- #}
+          <div id="overall-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated {% if overall_percent_complete == 100 %}bg-success{% else %}bg-primary{% endif %}" role="progressbar" style="width: {{ overall_percent_complete }}%;" aria-valuenow="{{ overall_percent_complete }}" aria-valuemin="0" aria-valuemax="100">{{ overall_percent_complete }}%</div>
         </div>
       </div>
       <div class="col-md-4">
         <div class="card text-center h-100">
           <div class="card-body py-2">
-              <p class="card-text mb-0">
+              {# --- ID added to text for updates --- #}
+              <p id="overall-progress-text" class="card-text mb-0">
                   <strong class="fs-5">{{ total_completed_steps }}</strong> / {{ total_steps_in_path }} Steps Completed
               </p>
-              <small class="text-muted d-block">{{ timeline_estimate }}</small>
+              {# --- ID added to timeline text for potential future updates --- #}
+              <small id="timeline-estimate-text" class="text-muted d-block">{{ timeline_estimate }}</small>
           </div>
         </div>
       </div>
@@ -43,40 +47,41 @@
       {% if milestones %}
         {% for milestone in milestones %}
           <div class="accordion-item">
+            {# --- ID added to header for potential targeting --- #}
             <h2 class="accordion-header" id="heading{{ milestone.id }}">
-              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ milestone.id }}" aria-expanded="false" aria-controls="collapse{{ milestone.id }}">
+              {% set progress = milestone_progress.get(milestone.id) %}
+              {# --- Added conditional class to button based on completion --- #}
+              <button class="accordion-button collapsed {% if progress and progress.percent == 100 and progress.total > 0 %}bg-success-subtle text-success{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ milestone.id }}" aria-expanded="false" aria-controls="collapse{{ milestone.id }}">
                 <div class="w-100 d-flex justify-content-between align-items-center pe-3">
                   <span>Milestone {{ loop.index }}: {{ milestone.name }}</span>
-                  {# --- MODIFIED Milestone Progress Display --- #}
-                  {% set progress = milestone_progress.get(milestone.id) %}
+                  {# --- Milestone Progress Display (with ID) --- #}
                   {% if progress and progress.total > 0 %}
-                    {# Check if completed == total #}
                     {% if progress.completed == progress.total %}
-                      <span class="badge bg-success ms-2"> {# Use Bootstrap success badge #}
+                      <span id="milestone-{{ milestone.id }}-progress-text" class="badge bg-success ms-2">
                         <i class="bi bi-check-circle-fill me-1"></i>Completed
                       </span>
                     {% else %}
-                      {# Show progress text only if not fully complete #}
-                      <span class="badge bg-light text-dark ms-2">
+                      <span id="milestone-{{ milestone.id }}-progress-text" class="badge bg-light text-dark ms-2">
                         {{ progress.completed }} / {{ progress.total }} Done ({{ progress.percent }}%)
                       </span>
                     {% endif %}
                   {% elif progress %} {# Case where total steps is 0 #}
-                     <span class="badge bg-light text-dark ms-2">0 / 0 Done</span>
+                     <span id="milestone-{{ milestone.id }}-progress-text" class="badge bg-light text-dark ms-2">0 / 0 Done</span>
                   {% endif %}
-                  {# --- End MODIFIED Display --- #}
+                  {# --- End Milestone Progress Display --- #}
                 </div>
               </button>
             </h2>
             <div id="collapse{{ milestone.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ milestone.id }}" data-bs-parent="#milestonesAccordion">
               <div class="accordion-body">
-                {# Milestone Progress Bar #}
+                {# --- Milestone Progress Bar (with IDs) --- #}
                 {% set progress = milestone_progress.get(milestone.id) %}
                 {% if progress and progress.total > 0 %}
-                  <div class="progress mb-3" style="height: 8px;">
-                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ progress.percent }}%;" aria-valuenow="{{ progress.percent }}" aria-valuemin="0" aria-valuemax="100"></div>
+                  <div id="milestone-{{ milestone.id }}-progress-bar-container" class="progress mb-3" style="height: 8px;" title="{{ progress.percent }}% Complete">
+                    <div id="milestone-{{ milestone.id }}-progress-bar" class="progress-bar {% if progress.percent == 100 %}bg-success{% else %}bg-primary{% endif %}" role="progressbar" style="width: {{ progress.percent }}%;" aria-valuenow="{{ progress.percent }}" aria-valuemin="0" aria-valuemax="100"></div>
                   </div>
                 {% endif %}
+                {# --- End Progress Bar --- #}
 
                 {% if milestone.description %}
                   <p>{{ milestone.description }}</p>
@@ -86,212 +91,4 @@
                 <ul class="list-group">
                   {% for step in milestone.steps %} {# Access steps via relationship #}
                     <li class="list-group-item d-flex justify-content-between align-items-start">
-                      {# Step Details #}
-                      <div class="ms-2 me-auto">
-                        <div class="fw-bold">{{ step.sequence }}. {{ step.name }}</div>
-                        {% if step.description %}<small>{{ step.description }}</small><br>{% endif %}
-                        {% if step.estimated_time_minutes %}
-                          <small class="text-muted">Est. Time: {{ (step.estimated_time_minutes / 60)|round(1) if step.estimated_time_minutes >= 60 else step.estimated_time_minutes }} {{ 'hours' if step.estimated_time_minutes >= 60 else 'minutes' }}</small><br>
-                        {% endif %}
-                        {# Resources for the step #}
-                        {% if step.resources.count() > 0 %}
-                          <small>Resources:</small>
-                          <ul>
-                            {% for resource in step.resources %}
-                              <li>
-                                {# Recommendation Badge #}
-                                {% if resource.id in recommended_resource_ids %}
-                                  <span class="badge bg-warning text-dark me-1 align-middle" title="Recommended based on your profile"><i class="bi bi-star-fill"></i></span>
-                                {% endif %}
-                                {# End Recommendation Badge #}
-                                <a href="{{ resource.url }}" target="_blank" rel="noopener noreferrer">
-                                  {{ resource.name }} {% if resource.resource_type %}({{ resource.resource_type }}){% endif %}
-                                </a>
-                              </li>
-                            {% endfor %}
-                          </ul>
-                        {% endif %} {# End if step.resources #}
-
-                        {# --- << NEW: Conditional Add Proof Link based on step_type >> --- #}
-                        {# Define which step types should show the "Add Proof" link #}
-                        {% set proof_relevant_types = ['Project', 'Certificate', 'Assessment', 'Internship'] %} {# Adjust this list as needed #}
-
-                        {% if step.step_type in proof_relevant_types %}
-                          <div class="mt-2">
-                              <a href="{{ url_for('add_portfolio_item', step_id=step.id) }}" class="btn btn-sm btn-outline-secondary py-0" title="Add proof or link for this step">
-                                  <small><i class="bi bi-paperclip me-1"></i>Link/Upload Proof</small>
-                              </a>
-                          </div>
-                        {% endif %}
-                        {# --- << End Conditional Add Proof Link >> --- #}
-
-                      {# Step Completion Status/Button #}
-                      <span class="badge bg-light text-dark ms-2 align-self-center">
-                        {% if step.id in completed_step_ids %}
-                          <span class="text-success fw-bold">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-circle-fill me-1" viewBox="0 0 16 16" style="vertical-align: -0.125em;">
-                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
-                              </svg>Completed
-                          </span>
-                        {% else %}
-                          <form method="POST" action="{{ url_for('toggle_step_status', step_id=step.id) }}" class="d-inline toggle-step-form" data-step-id="{{ step.id }}" data-milestone-id="{{ milestone.id }}" class="d-inline">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/> {# Ensure CSRF token is included #}
-                            <button type="submit" class="btn btn-sm btn-outline-success py-0" title="Mark as complete">
-                               <small>Done?</small>
-                            </button>
-                          </form>
-                        {% endif %}
-                      </span> {# End badge #}
-                    </li> {# End list item #}
-                  {% else %}
-                    <li class="list-group-item">No steps defined for this milestone yet.</li>
-                  {% endfor %}
-                </ul> {# End list group #}
-              </div> {# End accordion body #}
-            </div> {# End collapse #}
-          </div> {# End accordion item #}
-        {% endfor %}
-      {% else %}
-        <p>No milestones defined for this career path yet.</p>
-      {% endif %}
-    </div> {# End accordion #}
-
-  {# --- If no path selected --- #}
-  {% else %}
-    <p>You haven't selected a target career path yet. Please complete your profile.</p>
-    <a href="{{ url_for('onboarding') }}" class="btn btn-primary">Complete Profile</a>
-  {% endif %}
-
-{% endblock %}
-                          
-{# --- NEW: Scripts Block for AJAX --- #}
-{% block scripts %}
-{{ super() }} {# Include scripts from base template if any #}
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-
-    // --- Toast Initialization & Helper Function ---
-    const toastLiveElement = document.getElementById('liveToast');
-    const toastTitleElement = document.getElementById('toastTitle');
-    const toastBodyElement = document.getElementById('toastBody');
-    let liveToast = null;
-    if (toastLiveElement) {
-        liveToast = new bootstrap.Toast(toastLiveElement, { delay: 3000 }); // 3 second delay
-    }
-
-    function showToast(message, title = 'Notification', isError = false) {
-        if (liveToast && toastBodyElement && toastTitleElement) {
-             toastBodyElement.textContent = message;
-             toastTitleElement.textContent = title;
-             // Optional: Change header color based on error
-             toastLiveElement.querySelector('.toast-header').classList.toggle('bg-danger', isError);
-             toastLiveElement.querySelector('.toast-header').classList.toggle('text-white', isError);
-             toastLiveElement.querySelector('.toast-header').classList.toggle('bg-light', !isError);
-            liveToast.show();
-        } else {
-            console.error("Toast elements not found!");
-            // Fallback alert for critical errors
-            if(isError) alert("Error: " + message);
-        }
-    }
-    // --- End Toast ---
-
-
-    // --- AJAX Step Toggle Logic ---
-    const dashboardContent = document.querySelector('.accordion'); // Or a more specific parent container
-
-    if (dashboardContent) {
-        dashboardContent.addEventListener('submit', function(event) {
-            // Check if the submitted element is a toggle form
-            if (event.target.classList.contains('toggle-step-form')) {
-                event.preventDefault(); // Stop normal form submission
-
-                const form = event.target;
-                const url = form.action;
-                const stepId = form.dataset.stepId;
-                const milestoneId = form.dataset.milestoneId; // Get milestone ID
-                const csrfToken = form.querySelector('input[name="csrf_token"]').value;
-                const buttonContainer = form.parentElement; // The span containing the form
-
-                // Basic Loading Indicator (optional)
-                form.querySelector('button').disabled = true;
-                form.querySelector('button small').textContent = '...';
-
-                fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': csrfToken // Send CSRF token in header
-                        // Add other headers if needed, like 'Accept': 'application/json'
-                    }
-                    // No body needed for this simple toggle POST
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        // Handle HTTP errors (like 500)
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response.json(); // Parse JSON response
-                })
-                .then(data => {
-                    if (data.success) {
-                        showToast(data.message, 'Update Success');
-
-                        // Update the UI for this specific step
-                        if (data.new_status === 'completed') {
-                             // Replace form with "Completed" badge
-                             buttonContainer.innerHTML = `
-                                <span class="text-success fw-bold">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-circle-fill me-1" viewBox="0 0 16 16" style="vertical-align: -0.125em;">
-                                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
-                                    </svg>Completed
-                                </span>`;
-                        } else {
-                            // Replace "Completed" badge with the form (needed if implementing toggle back)
-                            // For now, we only go one way, but this structure allows it
-                             buttonContainer.innerHTML = `
-                                <form method="POST" action="${url}" class="d-inline toggle-step-form" data-step-id="${stepId}" data-milestone-id="${milestoneId}">
-                                    <input type="hidden" name="csrf_token" value="${csrfToken}"/>
-                                    <button type="submit" class="btn btn-sm btn-outline-success py-0" title="Mark as complete">
-                                        <small>Done?</small>
-                                    </button>
-                                </form>`;
-                        }
-
-                        // --- TODO: Update Progress Bars Dynamically (More complex) ---
-                        // This requires getting the updated progress data from the backend response
-                        // and targeting the specific progress bars/text elements.
-                        // Example (requires backend to send milestone_progress & overall_progress):
-                        // if (data.milestone_progress && data.milestone_id) {
-                        //     updateMilestoneProgress(data.milestone_id, data.milestone_progress);
-                        // }
-                        // if (data.overall_progress) {
-                        //     updateOverallProgress(data.overall_progress);
-                        // }
-                        // console.log("Progress bars should update - implementation pending.");
-                        // --- End TODO ---
-
-
-                    } else {
-                        // Show error from backend JSON
-                        showToast(data.message || 'An unknown error occurred.', 'Update Failed', true);
-                         // Re-enable button on failure
-                         form.querySelector('button').disabled = false;
-                         form.querySelector('button small').textContent = 'Done?';
-                    }
-                })
-                .catch(error => {
-                    console.error('Fetch Error:', error);
-                    showToast('Could not connect to server. Please try again.', 'Network Error', true);
-                    // Re-enable button on failure
-                    form.querySelector('button').disabled = false;
-                    form.querySelector('button small').textContent = 'Done?';
-                });
-            } // end if target is toggle form
-        }); // end event listener
-    } // end if dashboardContent exists
-
-}); // end DOMContentLoaded
-</script>
-{% endblock %}
-{# --- End Scripts Block --- #}
+                      {# Step Details #
