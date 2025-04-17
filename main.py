@@ -1200,74 +1200,112 @@ def profile():
 @app.route('/path/step/<int:step_id>/toggle', methods=['POST'])
 @login_required
 def toggle_step_status(step_id):
-    """Handles AJAX request to mark a step as complete or incomplete."""
+    """Marks a step as complete or incomplete for the current user."""
     step = Step.query.get_or_404(step_id)
-
-    # Optional ownership check (if needed)
-    # if step.milestone.career_path_id != current_user.target_career_path_id:
-    #     return jsonify({'success': False, 'message': 'Unauthorized action.'}), 403
-
     user_status = UserStepStatus.query.filter_by(user_id=current_user.id, step_id=step.id).first()
     new_status = 'not_started' # Default assumption
     flash_message = ''
+    milestone_completed_now = False # Flag for milestone completion
 
     try:
         if user_status:
             if user_status.status == 'completed':
+                # Mark as not started
                 user_status.status = 'not_started'
                 user_status.completed_at = None
                 new_status = 'not_started'
                 flash_message = f'Step "{step.name}" marked as not started.'
             else:
+                # Mark as completed
                 user_status.status = 'completed'
+                # --- CORRECTION HERE ---
                 user_status.completed_at = datetime.utcnow()
+                # --- End Correction ---
                 new_status = 'completed'
                 flash_message = f'Step "{step.name}" marked as completed!'
+                milestone_completed_now = True # Check milestone completion only when marking a step complete
         else:
+            # Create new status as completed
             user_status = UserStepStatus(
                 user_id=current_user.id,
                 step_id=step.id,
                 status='completed',
+                # --- CORRECTION HERE ---
                 completed_at=datetime.utcnow()
+                # --- End Correction ---
             )
             db.session.add(user_status)
             new_status = 'completed'
             flash_message = f'Step "{step.name}" marked as completed!'
+            milestone_completed_now = True # Check milestone completion only when marking a step complete
 
         db.session.commit()
 
-        # --- Check for milestone completion AFTER commit ---
-        milestone_completed_now = False
-        if new_status == 'completed' and step.milestone:
-             milestone = step.milestone
-             all_milestone_step_ids_query = Step.query.filter_by(milestone_id=milestone.id).with_entities(Step.id)
-             all_milestone_step_ids = {step_id for step_id, in all_milestone_step_ids_query.all()}
-             total_steps_in_milestone = len(all_milestone_step_ids)
-             if total_steps_in_milestone > 0:
-                 completed_statuses_query = UserStepStatus.query.filter(
-                     UserStepStatus.user_id == current_user.id,
-                     UserStepStatus.status == 'completed',
-                     UserStepStatus.step_id.in_(all_milestone_step_ids)
-                 ).with_entities(UserStepStatus.step_id)
-                 completed_count = completed_statuses_query.count() # Use count() query
-                 if completed_count == total_steps_in_milestone:
-                     milestone_completed_now = True
-                     flash_message += f' Milestone "{milestone.name}" also complete!' # Append to message
+        # Check if Milestone is now Complete (logic remains same)
+        if milestone_completed_now and step.milestone:
+            milestone = step.milestone
+            all_milestone_step_ids_query = Step.query.filter_by(milestone_id=milestone.id).with_entities(Step.id)
+            all_milestone_step_ids = {step_id for step_id, in all_milestone_step_ids_query.all()}
+            total_steps_in_milestone = len(all_milestone_step_ids)
 
-        # Return JSON instead of redirecting
+            if total_steps_in_milestone > 0:
+                completed_statuses_in_milestone_query = UserStepStatus.query.filter(
+                    UserStepStatus.user_id == current_user.id,
+                    UserStepStatus.status == 'completed',
+                    UserStepStatus.step_id.in_(all_milestone_step_ids)
+                ).with_entities(UserStepStatus.step_id)
+                completed_count = completed_statuses_query.count()
+
+                if completed_count == total_steps_in_milestone:
+                    milestone_completed_now = True # Keep flag true
+                    flash_message += f' Milestone "{milestone.name}" also complete!'
+                else: # Reset flag if milestone not actually complete
+                    milestone_completed_now = False
+            else: # Milestone has no steps
+                milestone_completed_now = False
+
+
+        # Return JSON instead of redirecting (for AJAX)
+        # Query updated progress AFTER commit and milestone check
+        updated_milestone_progress = {}
+        updated_overall_progress = {}
+        if step.milestone: # Recalculate progress for the affected milestone
+             m_id = step.milestone.id
+             m_total = Step.query.filter_by(milestone_id=m_id).count()
+             if m_total > 0:
+                 m_step_ids_q = Step.query.filter_by(milestone_id=m_id).with_entities(Step.id)
+                 m_step_ids = {sid for sid, in m_step_ids_q.all()}
+                 m_completed_q = UserStepStatus.query.filter(UserStepStatus.user_id == current_user.id, UserStepStatus.status == 'completed', UserStepStatus.step_id.in_(m_step_ids)).with_entities(UserStepStatus.step_id)
+                 m_completed = m_completed_q.count()
+                 m_percent = round((m_completed / m_total) * 100)
+                 updated_milestone_progress = {'completed': m_completed, 'total': m_total, 'percent': m_percent}
+
+        # Recalculate overall progress
+        if current_user.target_career_path:
+            all_path_steps_q = Step.query.join(Milestone).filter(Milestone.career_path_id == current_user.target_career_path_id).with_entities(Step.id)
+            all_path_step_ids = {sid for sid, in all_path_steps_q.all()}
+            o_total = len(all_path_step_ids)
+            if o_total > 0:
+                o_completed_q = UserStepStatus.query.filter(UserStepStatus.user_id == current_user.id, UserStepStatus.status == 'completed', UserStepStatus.step_id.in_(all_path_step_ids)).with_entities(UserStepStatus.step_id)
+                o_completed = o_completed_q.count()
+                o_percent = round((o_completed / o_total) * 100)
+                updated_overall_progress = {'completed': o_completed, 'total': o_total, 'percent': o_percent}
+
+
         return jsonify({
             'success': True,
             'new_status': new_status,
             'step_id': step.id,
-            'milestone_id': step.milestone_id, # Send milestone ID
+            'milestone_id': step.milestone_id,
             'message': flash_message,
-            'milestone_completed': milestone_completed_now # Send flag
+            'milestone_completed': milestone_completed_now,
+            'milestone_progress': updated_milestone_progress, # Send updated progress
+            'overall_progress': updated_overall_progress   # Send updated progress
         })
 
     except Exception as e:
         db.session.rollback()
         print(f"Error updating step status via AJAX for user {current_user.id}, step {step_id}: {e}")
-        # Return JSON error
         return jsonify({'success': False, 'message': 'An error occurred while updating status.'}), 500
 
 # --- NEW CV Download Route ---
