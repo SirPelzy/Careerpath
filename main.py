@@ -666,7 +666,7 @@ def login():
         user = User.query.filter_by(email=form.email.data.lower()).first()
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember_me.data)
-            user.last_login = datetime.datetime.utcnow()
+            user.last_login = datetime.utcnow()
             try:
                 db.session.commit()
             except Exception as e:
