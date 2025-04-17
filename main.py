@@ -1283,22 +1283,23 @@ def toggle_step_status(step_id):
         # Recalculate overall progress
         updated_overall_progress = {} # Initialize default
         if current_user.target_career_path:
+            # Get all step IDs for the path
             all_path_steps_q = Step.query.join(Milestone).filter(Milestone.career_path_id == current_user.target_career_path_id).with_entities(Step.id)
             all_path_step_ids = {sid for sid, in all_path_steps_q.all()}
             o_total = len(all_path_step_ids)
             if o_total > 0:
-                # Perform the query to get the count of completed steps within this path
-                o_completed_q = UserStepStatus.query.filter(
+                # Perform the query using the correct variable name
+                o_completed_q = UserStepStatus.query.filter( # Query defined here
                     UserStepStatus.user_id == current_user.id,
                     UserStepStatus.status == 'completed',
                     UserStepStatus.step_id.in_(all_path_step_ids) # Use all_path_step_ids
                 )
-                o_completed = o_completed_q.count() # Get the count correctly
+                o_completed = o_completed_q.count() # Use the count from the query above
 
                 o_percent = round((o_completed / o_total) * 100)
                 updated_overall_progress = {'completed': o_completed, 'total': o_total, 'percent': o_percent}
-        # --- End Corrected Recalculation --
-
+        # --- End Corrected Recalculation ---
+        
         return jsonify({
             'success': True,
             'new_status': new_status,
