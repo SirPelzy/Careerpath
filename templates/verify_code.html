@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Careerpath!{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+  <div class="col-md-6">
+    <h2 class="text-center">Verify Your Email</h2>
+    {% if email %}
+    <p class="text-center text-muted">Enter the 4-digit code sent to <strong>{{ email }}</strong>. It expires in 15 minutes.</p>
+    {% else %}
+    <p class="text-center text-muted">Enter the 4-digit code sent to your email.</p>
+    {% endif %}
+
+    {# Optional: Link to resend code - Implement later #}
+    {# <p class="text-center"><a href="#">Resend Code?</a></p> #}
+
+    {# Pass email back in action URL to ensure it's available on POST if needed #}
+    <form method="POST" action="{{ url_for('verify_code_entry', email=email) }}" class="mt-4" novalidate>
+        {{ form.hidden_tag() }} <div class="mb-3">
+            {{ form.code.label(class="form-label visually-hidden") }} {# Hide label visually #}
+            {# Add form-control-lg for bigger input, text-center #}
+            {{ form.code(class="form-control form-control-lg text-center" + (" is-invalid" if form.code.errors else ""), size="6", maxlength="6", autofocus=true) }}
+            {% if form.code.errors %}
+              <div class="invalid-feedback text-center">
+                {% for error in form.code.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+            <div class="form-text text-center">Enter the 4-digit code from your email.</div>
+        </div>
+
+        <div class="d-grid mt-4">
+            {{ form.submit(class="btn btn-primary btn-lg") }}
+        </div>
+    </form>
+
+     <div class="text-center mt-4">
+        <small><a href="{{ url_for('login') }}">Back to Login</a></small>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
