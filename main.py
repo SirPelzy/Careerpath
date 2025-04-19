@@ -19,6 +19,7 @@ import random
 import string
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
+from functools import wraps
 
 # --- NEW Email Sending Helper (using Brevo API) ---
 def send_email(to, subject, template_prefix, **kwargs):
@@ -75,6 +76,39 @@ def send_email(to, subject, template_prefix, **kwargs):
     except Exception as e:
         print(f"ERROR sending email via Brevo API to {to}: {e}")
         return False
+
+
+def plan_required(*allowed_plans):
+    """
+    Decorator to restrict access to routes based on the user's subscription plan.
+    Checks for authentication first.
+    Assumes user.plan stores the plan name (e.g., 'Free', 'Basic', 'Starter', 'Pro').
+    Plan names are checked case-insensitively.
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            # 1. Check if user is logged in (handled by @login_required typically, but good practice)
+            if not current_user.is_authenticated:
+                # Use Flask-Login's mechanism to handle unauthorized access
+                return login_manager.unauthorized()
+
+            # 2. Check if the user's plan is allowed
+            user_plan = getattr(current_user, 'plan', 'Free').lower() # Default to 'Free' if no plan attribute
+            normalized_allowed_plans = {plan.lower() for plan in allowed_plans}
+
+            if user_plan not in normalized_allowed_plans:
+                # 3. If plan not allowed, flash message and redirect
+                feature_name = f.__name__.replace('_', ' ').title() # Get a readable function name
+                flash(f'Access to the "{feature_name}" feature requires an upgraded plan. Please select a suitable plan below.', 'warning')
+                return redirect(url_for('pricing_page')) # Redirect to pricing
+
+            # 4. If plan is allowed, execute the original route function
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+# --- End Decorator Definition ---
 
 # --- Define Plan Details ---
 # Prices are in kobo (lowest currency unit for NGN)
@@ -893,6 +927,7 @@ def get_portfolio_upload_path(filename):
 
 @app.route('/portfolio')
 @login_required
+@plan_required('Starter', 'Pro')
 def portfolio():
     """Displays the user's portfolio items."""
     items = PortfolioItem.query.filter_by(user_id=current_user.id).order_by(PortfolioItem.created_at.desc()).all()
@@ -901,6 +936,7 @@ def portfolio():
 # --- Portfolio Add Route ---
 @app.route('/portfolio/add', methods=['GET', 'POST'])
 @login_required
+@plan_required('Starter', 'Pro')
 def add_portfolio_item():
     """Handles adding a new portfolio item, optionally linked to a step/milestone."""
     form = PortfolioItemForm()
@@ -984,6 +1020,7 @@ def add_portfolio_item():
 
 @app.route('/portfolio/<int:item_id>/edit', methods=['GET', 'POST'])
 @login_required
+@plan_required('Starter', 'Pro')
 def edit_portfolio_item(item_id):
     """Handles editing an existing portfolio item."""
     item = PortfolioItem.query.get_or_404(item_id)
@@ -1046,6 +1083,7 @@ def edit_portfolio_item(item_id):
 
 @app.route('/portfolio/<int:item_id>/delete', methods=['POST'])
 @login_required
+@plan_required('Starter', 'Pro')
 def delete_portfolio_item(item_id):
     """Handles deleting a portfolio item."""
     item = PortfolioItem.query.get_or_404(item_id)
@@ -1078,6 +1116,7 @@ def delete_portfolio_item(item_id):
 # --- NEW Portfolio File Download Route ---
 @app.route('/portfolio/download/<int:item_id>')
 @login_required
+@plan_required('Starter', 'Pro')
 def download_portfolio_file(item_id):
     """Provides download access to an uploaded portfolio file, checking ownership."""
     item = PortfolioItem.query.get_or_404(item_id)
