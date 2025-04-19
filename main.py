@@ -110,6 +110,69 @@ def plan_required(*allowed_plans):
 
 # --- End Decorator Definition ---
 
+
+INTERVIEW_QUESTIONS = {
+    'General': [
+        "Tell me about yourself.",
+        "Why are you interested in this role/company?",
+        "What are your strengths?",
+        "What are your weaknesses?",
+        "Describe a challenging project you worked on and how you handled it (STAR method).",
+        "Describe a time you failed and what you learned.",
+        "Where do you see yourself in 5 years?",
+        "Why do you want to transition into tech / this specific field?",
+        "How do you handle working under pressure or tight deadlines?",
+        "Do you have any questions for us?"
+    ],
+    'Data Analysis / Analytics': [
+        "Explain the difference between SQL JOIN types (INNER, LEFT, RIGHT, FULL OUTER).",
+        "What is a primary key and a foreign key?",
+        "How would you handle missing data in a dataset?",
+        "Describe different types of data visualizations and when to use them.",
+        "Explain selection bias.",
+        "What are aggregate functions in SQL? Give examples.",
+        "Describe a data analysis project you completed (mention tools used, process, outcome).",
+        "How would you explain p-value to a non-technical person?",
+        "Scenario: How would you investigate a sudden drop in user engagement metrics?",
+        "Python: How do you group data using Pandas?" # Example technical
+    ],
+    'UX/UI Design': [
+        "Walk me through your design process.",
+        "Tell me about a project in your portfolio you're proud of and why.",
+        "How do you handle negative feedback on your designs?",
+        "What's the difference between UX and UI?",
+        "How do you conduct user research?",
+        "Explain responsive design.",
+        "What are usability heuristics?",
+        "Describe your experience with Figma (or other relevant tool).",
+        "How do you ensure your designs are accessible?",
+        "Scenario: How would you redesign the login flow for this app?"
+    ],
+    'Cybersecurity': [
+        "Explain the CIA triad.",
+        "What is the difference between symmetric and asymmetric encryption?",
+        "Describe common types of malware.",
+        "What is the purpose of a firewall?",
+        "Explain the difference between vulnerability assessment and penetration testing.",
+        "What steps would you take if you suspected a system was compromised?",
+        "What is social engineering? Give examples.",
+        "Explain the concept of least privilege.",
+        "What is OWASP Top 10?",
+        "Describe your familiarity with Linux command line."
+    ],
+    'Software Engineering': [
+        "Explain Object-Oriented Programming (OOP) principles.",
+        "What is the difference between a list and a tuple in Python?",
+        "Describe the request/response cycle in web applications.",
+        "What is version control and why is it important? Describe a Git workflow.",
+        "Explain RESTful APIs.",
+        "What are common data structures? When would you use a dictionary vs a list?",
+        "Describe unit testing.",
+        "What is the difference between SQL and NoSQL databases?",
+        "Explain the concept of dependency injection.",
+        "Scenario: How would you approach debugging a slow API endpoint?"
+    ]
+
 # --- Define Plan Details ---
 # Prices are in kobo (lowest currency unit for NGN)
 PLANS = {
@@ -1383,6 +1446,30 @@ def delete_cv():
         flash("An error occurred while updating your profile after CV deletion.", "danger")
 
     return redirect(url_for('profile'))
+
+
+# --- NEW Interview Prep Route ---
+@app.route('/interview-prep')
+@login_required
+@plan_required('Pro') # Restrict to Pro plan users
+def interview_prep():
+    """Displays interview questions relevant to the user's path."""
+    general_questions = INTERVIEW_QUESTIONS.get('General', [])
+    path_specific_questions = []
+    path_name = "Your Target Path" # Default
+
+    if current_user.target_career_path:
+        path_name = current_user.target_career_path.name
+        # Get questions for the specific path, default to empty list if path name not in dict
+        path_specific_questions = INTERVIEW_QUESTIONS.get(path_name, [])
+
+    return render_template('interview_prep.html',
+                           title="Interview Preparation",
+                           path_name=path_name,
+                           general_questions=general_questions,
+                           path_specific_questions=path_specific_questions,
+                           is_homepage=False,
+                           body_class='in-app-layout')
 
 # --- Password Reset Routes ---
 @app.route("/reset_password", methods=['GET', 'POST'])
