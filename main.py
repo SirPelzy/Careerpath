@@ -173,6 +173,8 @@ INTERVIEW_QUESTIONS = {
         "Scenario: How would you approach debugging a slow API endpoint?"
     ]
 
+}
+
 # --- Define Plan Details ---
 # Prices are in kobo (lowest currency unit for NGN)
 PLANS = {
