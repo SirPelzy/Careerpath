@@ -324,3 +324,10 @@ class VerifyCodeForm(FlaskForm):
     submit = SubmitField('Verify Email')
 
 
+# --- New CV Helper Form ---
+class CVHelperForm(FlaskForm):
+    """Form for pasting Job Description."""
+    job_description = TextAreaField('Paste Job Description Here',
+                                    validators=[DataRequired(), Length(min=50, max=10000)],
+                                    render_kw={"rows": 15, "placeholder": "Paste the full job description text here..."})
+    submit = SubmitField('Analyze Keywords')
