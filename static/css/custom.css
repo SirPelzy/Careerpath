@@ -207,3 +207,9 @@ a:hover {
 .footer-section hr { border-color: rgba(255,255,255,0.2); margin-top: 2rem;}
 .footer-section .small a { color: var(--cp-grey); }
 .footer-section .small a:hover { color: var(--cp-white); }
+
+
+body.in-app-layout {
+  padding-top: 4rem; /* Keep padding for fixed buttons */
+  padding-bottom: 3rem; /* Add bottom padding to body */
+}
