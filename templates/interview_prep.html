@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Careerpath!{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h1 class="h2 mb-3">Interview Preparation</h1>
+  <p class="lead">Practice common questions for your target role: **{{ path_name }}**</p>
+  <p>Remember to structure your answers using methods like STAR (Situation, Task, Action, Result) for behavioural questions.</p>
+  <hr>
+
+  {# General / Behavioural Questions #}
+  <h3 class="h5 mt-4 mb-3">General / Behavioural Questions</h3>
+  {% if general_questions %}
+    <ul class="list-group list-group-flush">
+      {% for question in general_questions %}
+        <li class="list-group-item">{{ question }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No general questions available yet.</p>
+  {% endif %}
+
+  {# Path Specific Questions #}
+  <h3 class="h5 mt-5 mb-3">{{ path_name }} Specific Questions</h3>
+   {% if path_specific_questions %}
+    <ul class="list-group list-group-flush">
+      {% for question in path_specific_questions %}
+        <li class="list-group-item">{{ question }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No specific questions available yet for this path.</p>
+  {% endif %}
+
+  {# TODO: Add links to external interview prep resources? Input fields for answers? #}
+
+</div>
+{% endblock %}
