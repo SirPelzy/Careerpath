@@ -20,6 +20,8 @@ import string
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 from functools import wraps
+from forms import CVHelperForm
+import re
 
 # --- NEW Email Sending Helper (using Brevo API) ---
 def send_email(to, subject, template_prefix, **kwargs):
@@ -109,6 +111,27 @@ def plan_required(*allowed_plans):
     return decorator
 
 # --- End Decorator Definition ---
+
+COMMON_TECH_KEYWORDS = set([
+    # Programming Languages
+    'python', 'javascript', 'java', 'c#', 'c++', 'php', 'ruby', 'go', 'swift', 'kotlin', 'typescript', 'sql',
+    # Frontend Frameworks/Libs
+    'react', 'angular', 'vue', 'svelte', 'jquery', 'html', 'css', 'bootstrap', 'tailwind', 'sass', 'less',
+    # Backend Frameworks/Libs
+    'node.js', 'express', 'django', 'flask', 'ruby on rails', 'spring boot', '.net', 'laravel',
+    # Databases
+    'postgresql', 'mysql', 'sqlite', 'mongodb', 'redis', 'sql server', 'oracle', 'nosql',
+    # Cloud / DevOps
+    'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'terraform', 'ansible', 'jenkins', 'git', 'github', 'gitlab', 'ci/cd',
+    # Data Science / ML
+    'pandas', 'numpy', 'scipy', 'scikit-learn', 'tensorflow', 'pytorch', 'keras', 'matplotlib', 'seaborn', 'power bi', 'tableau', 'excel', 'machine learning', 'data analysis', 'statistics',
+    # UX/UI
+    'figma', 'sketch', 'adobe xd', 'invision', 'user research', 'wireframing', 'prototyping', 'user testing', 'design system', 'ui', 'ux', 'user interface', 'user experience',
+    # Cybersecurity
+    'security+', 'ceh', 'cissp', 'nmap', 'wireshark', 'metasploit', 'siem', 'ids/ips', 'firewall', 'vpn', 'penetration testing', 'vulnerability assessment', 'incident response', 'owasp', 'nist', 'iso 27001',
+    # Soft Skills / Other
+    'agile', 'scrum', 'jira', 'communication', 'teamwork', 'leadership', 'problem solving', 'management', 'analysis', 'design', 'collaboration'
+])
 
 
 INTERVIEW_QUESTIONS = {
@@ -1470,6 +1493,64 @@ def interview_prep():
                            path_name=path_name,
                            general_questions=general_questions,
                            path_specific_questions=path_specific_questions,
+                           is_homepage=False,
+                           body_class='in-app-layout')
+
+
+# --- NEW CV Helper Routes ---
+@app.route('/cv-helper', methods=['GET', 'POST'])
+@login_required
+@plan_required('Starter', 'Pro') # Apply plan restriction based on your pricing
+def cv_helper():
+    """Displays form to paste JD and processes it."""
+    form = CVHelperForm()
+    if form.validate_on_submit():
+        jd_text = form.job_description.data.lower() # Convert JD to lowercase once
+
+        # Basic Keyword Extraction from JD
+        extracted_keywords = {kw for kw in COMMON_TECH_KEYWORDS if kw in jd_text}
+
+        # Get User Data (Portfolio Titles/Desc, Interests)
+        user_data_text = (current_user.interests or "").lower()
+        portfolio_items = PortfolioItem.query.filter_by(user_id=current_user.id).all()
+        for item in portfolio_items:
+            user_data_text += " " + (item.title or "").lower()
+            user_data_text += " " + (item.description or "").lower()
+        # Could also include current_role, target_path name etc.
+
+        # Find matches and missing keywords
+        matched_keywords = {kw for kw in extracted_keywords if kw in user_data_text}
+        missing_keywords = extracted_keywords - matched_keywords
+
+        # Store results in session to display on next page
+        session['cv_helper_results'] = {
+            'matched': sorted(list(matched_keywords)),
+            'missing': sorted(list(missing_keywords)),
+            'jd_keywords': sorted(list(extracted_keywords)) # Also store all found in JD
+        }
+        return redirect(url_for('cv_helper_results'))
+
+    return render_template('cv_helper.html',
+                           title="CV Keyword Helper",
+                           form=form,
+                           is_homepage=False,
+                           body_class='in-app-layout')
+
+
+@app.route('/cv-helper/results')
+@login_required
+@plan_required('Starter', 'Pro') # Apply same plan restriction
+def cv_helper_results():
+    """Displays the results of the CV keyword analysis."""
+    results = session.pop('cv_helper_results', None) # Get results and clear from session
+
+    if not results:
+        flash("No analysis results found. Please submit a job description first.", "warning")
+        return redirect(url_for('cv_helper'))
+
+    return render_template('cv_helper_results.html',
+                           title="CV Keyword Analysis Results",
+                           results=results,
                            is_homepage=False,
                            body_class='in-app-layout')
 
