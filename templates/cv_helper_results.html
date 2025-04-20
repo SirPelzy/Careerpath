@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Careerpath!{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h1 class="h2 mb-3">{{ title }}</h1>
+  <p>We analyzed the job description you provided against your profile interests and portfolio items. Consider highlighting the 'Matched Keywords' and incorporating relevant 'Suggested Keywords' into your CV and portfolio descriptions.</p>
+  <hr>
+
+  <div class="row g-4">
+    {# Matched Keywords Column #}
+    <div class="col-md-6">
+      <h4><i class="bi bi-check-circle-fill text-success me-2"></i>Matched Keywords</h4>
+      <p class="text-muted">Keywords found in both the job description and your profile/portfolio:</p>
+      {% if results.matched %}
+        <ul class="list-inline">
+          {% for keyword in results.matched %}
+            <li class="list-inline-item"><span class="badge bg-success-subtle text-success-emphasis mb-1">{{ keyword }}</span></li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="alert alert-warning py-2">No direct matches found based on current keywords.</div>
+      {% endif %}
+    </div>
+
+    {# Suggested Keywords Column #}
+    <div class="col-md-6">
+       <h4><i class="bi bi-lightbulb-fill text-warning me-2"></i>Suggested Keywords</h4>
+       <p class="text-muted">Keywords found in the job description that you might want to add or emphasize:</p>
+       {% if results.missing %}
+         <ul class="list-inline">
+           {% for keyword in results.missing %}
+             <li class="list-inline-item"><span class="badge bg-warning-subtle text-warning-emphasis mb-1">{{ keyword }}</span></li>
+           {% endfor %}
+         </ul>
+       {% else %}
+         <div class="alert alert-success py-2">Great! All identified keywords from the JD seem covered in your profile/portfolio.</div>
+       {% endif %}
+    </div>
+  </div> {# End Row #}
+
+  <hr class="my-4">
+
+  {# All JD Keywords (Optional Display) #}
+  <div class="mb-4">
+     <h5>All Keywords Found in Job Description:</h5>
+     {% if results.jd_keywords %}
+        <p><small class="text-muted">
+            {% for keyword in results.jd_keywords %}
+                {{ keyword }}{% if not loop.last %}, {% endif %}
+            {% endfor %}
+        </small></p>
+     {% else %}
+         <p><small class="text-muted">No keywords identified from the list.</small></p>
+     {% endif %}
+  </div>
+
+
+  <div class="mt-4">
+    <a href="{{ url_for('cv_helper') }}" class="btn btn-secondary me-2"><i class="bi bi-arrow-left me-1"></i>Analyze Another JD</a>
+    <a href="{{ url_for('profile') }}" class="btn btn-outline-primary me-2"><i class="bi bi-person-fill me-1"></i>Edit Profile</a>
+    <a href="{{ url_for('portfolio') }}" class="btn btn-outline-primary"><i class="bi bi-briefcase-fill me-1"></i>Edit Portfolio</a>
+  </div>
+
+</div>
+{% endblock %}
