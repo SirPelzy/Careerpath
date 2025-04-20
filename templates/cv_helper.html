@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_formhelpers.html" import render_field %} {# Optional: Use form helpers #}
+
+{% block title %}{{ title }} - Careerpath!{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h1 class="h2 mb-3">{{ title }}</h1>
+  <p class="lead">Paste a job description below to identify key skills and keywords you might want to highlight in your CV and Careerpath! portfolio.</p>
+  <hr>
+
+  <form method="POST" action="" novalidate>
+    {{ form.hidden_tag() }} <div class="mb-3">
+      {{ form.job_description.label(class="form-label") }}
+      {{ form.job_description(class="form-control" + (" is-invalid" if form.job_description.errors else "")) }}
+      {% if form.job_description.errors %}
+        <div class="invalid-feedback">
+          {% for error in form.job_description.errors %}{{ error }}{% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="d-grid">
+      {{ form.submit(class="btn btn-primary btn-lg") }}
+    </div>
+  </form>
+</div>
+{% endblock %}
