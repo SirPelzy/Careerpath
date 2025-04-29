@@ -1,0 +1,44 @@
+# .dockerignore
+
+# Virtual Environment
+venv/
+.venv/
+
+# Git
+.git/
+.gitignore
+
+# Environment File (IMPORTANT!)
+.env
+
+# Python cache/compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE/Editor config
+.vscode/
+.idea/
+
+# Uploads (These should go to GCS or a Volume, not the image)
+uploads/
+
+# Migration files (Can sometimes be excluded, but often needed for context by Alembic)
+# migrations/
+
+# Testing artifacts
+.pytest_cache/
+htmlcov/
+*.cover
+*.log
+
+# Other tool configs if needed
+# .flake8
+# pyproject.toml (if using poetry/hatch and reqs generated)
+# Pipfile* (if using pipenv and reqs generated)
+
