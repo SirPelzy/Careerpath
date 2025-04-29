@@ -22,6 +22,10 @@ from sentry_sdk.integrations.flask import FlaskIntegration
 from functools import wraps
 from forms import CVHelperForm
 import re
+from flask_dance.contrib.google import make_google_blueprint
+from flask_dance.consumer import oauth_authorized
+from werkzeug.security import generate_password_hash
+import secrets
 
 # --- NEW Email Sending Helper (using Brevo API) ---
 def send_email(to, subject, template_prefix, **kwargs):
@@ -220,6 +224,16 @@ load_dotenv()
 app = Flask(__name__)
 
 # --- Configuration ---
+
+app.config['GOOGLE_OAUTH_CLIENT_ID'] = os.environ.get('GOOGLE_OAUTH_CLIENT_ID')
+app.config['GOOGLE_OAUTH_CLIENT_SECRET'] = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET')
+# For local testing over HTTP if needed (set in .env):
+if os.environ.get('OAUTHLIB_INSECURE_TRANSPORT'):
+    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
+if not app.config['GOOGLE_OAUTH_CLIENT_ID'] or not app.config['GOOGLE_OAUTH_CLIENT_SECRET']:
+     print("WARNING: Google OAuth credentials not fully configured.")
+
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a-very-secure-fallback-key-34567')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 if not app.config['SQLALCHEMY_DATABASE_URI']:
@@ -289,10 +303,106 @@ def load_user(user_id):
     """Loads user object for Flask-Login."""
     return User.query.get(int(user_id))
 
+
+# Create Google OAuth Blueprint using loaded config
+google_bp = make_google_blueprint(
+    client_id=app.config.get('GOOGLE_OAUTH_CLIENT_ID'),
+    client_secret=app.config.get('GOOGLE_OAUTH_CLIENT_SECRET'),
+    scope=["openid", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"],
+    # redirect_to="google_auth_callback" # Optional: specify explicit callback route
+)
+app.register_blueprint(google_bp, url_prefix="/login")
+
 # --- Routes ---
 @app.route('/')
 def home():
     return render_template('home.html', is_homepage=True)
+
+
+
+# --- Google OAuth Callback/Signal Handler ---
+@oauth_authorized.connect_via(google_bp)
+def google_logged_in(blueprint, token):
+    """Handles user login/registration after successful Google OAuth."""
+    if not token:
+        flash("Failed to log in with Google.", category="danger")
+        return redirect(url_for("login")) # Redirect to login page on failure
+
+    # Fetch user info from Google
+    # blueprint.session is an OAuth2Session instance provided by Flask-Dance
+    resp = blueprint.session.get("/oauth2/v3/userinfo")
+    if not resp.ok:
+        msg = "Failed to fetch user information from Google."
+        print(f"OAuth Error: {msg} Status: {resp.status_code} Response: {resp.text}")
+        flash(msg, category="danger")
+        return redirect(url_for("login"))
+
+    user_info = resp.json()
+    user_email = user_info.get("email", "").lower()
+    user_google_id = user_info.get("sub") # Optional: Store this later
+
+    if not user_email:
+        flash("Could not get email address from Google.", category="warning")
+        return redirect(url_for("login"))
+
+    # Find or create the user in our database
+    user = User.query.filter_by(email=user_email).first()
+
+    if not user:
+        # Create a new user
+        new_user = User(
+            email=user_email,
+            first_name=user_info.get("given_name", ""),
+            last_name=user_info.get("family_name", ""),
+            password_hash=generate_password_hash(secrets.token_urlsafe(32)), # Unusable password
+            email_verified=user_info.get("email_verified", False),
+            onboarding_complete=False # Require onboarding
+        )
+        try:
+            db.session.add(new_user)
+            db.session.commit()
+            user = new_user
+            flash("Account created via Google! Please complete your profile.", "success")
+            print(f"New user created via Google: {user.email}")
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error creating OAuth user {user_email}: {e}")
+            flash("Error creating your account via Google. Try manual registration.", "danger")
+            return redirect(url_for("register")) # Redirect to manual register
+    else:
+        # User exists - update verification status if needed
+        if not user.email_verified and user_info.get("email_verified", False):
+            try:
+                user.email_verified = True
+                db.session.commit()
+                print(f"Marked existing user {user.email} as verified via Google OAuth.")
+            except Exception as e:
+                 db.session.rollback()
+                 print(f"Error updating email verification for {user.email} during OAuth: {e}")
+        flash(f"Welcome back, {user.first_name}!", "success")
+
+
+    # Log the user in using Flask-Login
+    try:
+        # 'remember=True' keeps user logged in longer
+        login_user(user, remember=True)
+        session.pop('_flashes', None) # Clear Flask-Dance flashes if any
+    except Exception as e:
+         print(f"Error logging in user {user.email} after OAuth: {e}")
+         flash("Logged in with Google, but couldn't start session. Please try again.", "danger")
+         return redirect(url_for("login"))
+
+    # Determine redirect destination
+    if not user.onboarding_complete:
+        return redirect(url_for('onboarding'))
+    else:
+        # Redirect directly to dashboard after OAuth login
+        return redirect(url_for('dashboard'))
+
+    # Normally return False tells Flask-Dance we handled it,
+    # but explicit redirects above are clearer.
+    # return False
+
 
 # --- NEW Subscription Initiation Route ---
 @app.route('/subscribe/<plan_name>')
