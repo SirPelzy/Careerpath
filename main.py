@@ -228,6 +228,11 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # --- Configuration ---
 
+app.config['GCS_BUCKET_NAME'] = os.environ.get('GCS_BUCKET_NAME')
+if not app.config['GCS_BUCKET_NAME']:
+    print("WARNING: GCS_BUCKET_NAME not configured.")
+    
+
 app.config['GOOGLE_OAUTH_CLIENT_ID'] = os.environ.get('GOOGLE_OAUTH_CLIENT_ID')
 app.config['GOOGLE_OAUTH_CLIENT_SECRET'] = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET')
 # For local testing over HTTP if needed (set in .env):
