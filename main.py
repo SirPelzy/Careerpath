@@ -27,6 +27,7 @@ from flask_dance.consumer import oauth_authorized
 from werkzeug.security import generate_password_hash
 import secrets
 from werkzeug.middleware.proxy_fix import ProxyFix
+from google.cloud import storage
 
 # --- NEW Email Sending Helper (using Brevo API) ---
 def send_email(to, subject, template_prefix, **kwargs):
@@ -224,6 +225,7 @@ load_dotenv()
 
 app = Flask(__name__)
 
+storage_client = storage.Client()
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # --- Configuration ---
