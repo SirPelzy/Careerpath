@@ -16,3 +16,4 @@ Click>=8.1.0 # Flask depends on this
 itsdangerous>=2.0.0
 requests>=2.20.0
 sentry-sdk[flask]>=1.0.0
+Flask-Dance>=7.0.0
