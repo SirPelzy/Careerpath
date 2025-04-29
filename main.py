@@ -26,6 +26,7 @@ from flask_dance.contrib.google import make_google_blueprint
 from flask_dance.consumer import oauth_authorized
 from werkzeug.security import generate_password_hash
 import secrets
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # --- NEW Email Sending Helper (using Brevo API) ---
 def send_email(to, subject, template_prefix, **kwargs):
@@ -222,6 +223,8 @@ except ImportError as e:
 load_dotenv()
 
 app = Flask(__name__)
+
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # --- Configuration ---
 
