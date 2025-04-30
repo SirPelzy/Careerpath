@@ -974,10 +974,12 @@ def onboarding():
 @login_required
 def onboarding_form():
     if current_user.onboarding_complete:
-        return redirect(url_for('dashboard'))
+         return redirect(url_for('dashboard'))
 
     form = OnboardingForm()
+    linked_item_name = None # For potential display if linking implemented
 
+    # Pre-select path if recommended via query parameter
     if request.method == 'GET':
         recommended_path_id = request.args.get('recommended_path_id', type=int)
         if recommended_path_id:
@@ -989,7 +991,8 @@ def onboarding_form():
 
     if form.validate_on_submit():
         try:
-            cv_filename_to_save = current_user.cv_filename
+            # --- Handle CV Upload using GCS ---
+            gcs_object_name = current_user.cv_filename # Keep existing GCS name by default
             if form.cv_upload.data:
                 file = form.cv_upload.data
                 base_filename = secure_filename(file.filename)
@@ -997,25 +1000,39 @@ def onboarding_form():
                 name, ext = os.path.splitext(base_filename)
                 ext = ext.lower()
                 name = name[:100]
-                cv_filename_to_save = f"user_{current_user.id}_{unique_id}{ext}"
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], cv_filename_to_save)
-                if current_user.cv_filename and current_user.cv_filename != cv_filename_to_save:
-                    old_path = os.path.join(app.config['UPLOAD_FOLDER'], current_user.cv_filename)
-                    if os.path.exists(old_path):
-                        try:
-                            os.remove(old_path)
-                        except OSError as e:
-                            print(f"Error removing old CV {old_path}: {e}")
-                file.save(file_path)
-                print(f"CV saved to: {file_path}")
+                # Define object name/path within the bucket (e.g., using a 'cvs/' prefix)
+                gcs_object_name = f"cvs/user_{current_user.id}_{unique_id}{ext}"
 
+                try:
+                    bucket_name = current_app.config.get('GCS_BUCKET_NAME')
+                    if not bucket_name: raise ValueError("GCS Bucket Name not configured")
+                    bucket = storage_client.bucket(bucket_name)
+                    blob = bucket.blob(gcs_object_name)
+
+                    # NOTE: Deleting old CV usually happens on Profile edit, not initial onboarding.
+                    # If you wanted to delete here if one existed:
+                    # if current_user.cv_filename:
+                    #    try:
+                    #        old_blob = bucket.blob(current_user.cv_filename)
+                    #        if old_blob.exists(): old_blob.delete()
+                    #    except Exception as e_del: print(f"Error deleting old CV from GCS: {e_del}")
+
+                    print(f"Uploading CV to GCS: {gcs_object_name}")
+                    blob.upload_from_file(file, content_type=file.content_type)
+
+                except Exception as e_upload:
+                    print(f"Error uploading CV to GCS: {e_upload}")
+                    flash('Error uploading CV file. Please try again.', 'danger')
+                    gcs_object_name = current_user.cv_filename # Revert to old name if upload fails
+
+            # --- Update User Object ---
             current_user.target_career_path = form.target_career_path.data
             current_user.current_role = form.current_role.data
             current_user.employment_status = form.employment_status.data
             current_user.time_commitment = form.time_commitment.data
             current_user.interests = form.interests.data
             current_user.learning_style = form.learning_style.data if form.learning_style.data else None
-            current_user.cv_filename = cv_filename_to_save
+            current_user.cv_filename = gcs_object_name # Store GCS object name (or existing one)
             current_user.onboarding_complete = True
 
             db.session.commit()
@@ -1023,15 +1040,18 @@ def onboarding_form():
             return redirect(url_for('dashboard'))
 
         except Exception as e:
-            db.session.rollback()
-            print(f"Error during onboarding form save: {e}")
-            flash('An error occurred while saving your profile. Please try again.', 'danger')
+             db.session.rollback()
+             print(f"Error during onboarding form save: {e}")
+             flash('An error occurred while saving your profile. Please try again.', 'danger')
 
+    # Render the actual form template
     return render_template('onboarding_form.html',
-                          title='Complete Your Profile',
-                          form=form,
-                          is_homepage=False,
-                          body_class='in-app-layout')
+                           title='Complete Your Profile',
+                           form=form,
+                           # Pass linked_item_name if needed by template
+                           # linked_item_name=linked_item_name,
+                           is_homepage=False,
+                           body_class='in-app-layout')
 
 # --- Recommendation Test Route ---
 @app.route('/recommendation-test', methods=['GET', 'POST'])
@@ -1174,15 +1194,21 @@ def add_portfolio_item():
             name, ext = os.path.splitext(base_filename)
             ext = ext.lower()
             name = name[:100]
-            file_filename_to_save = f"user_{current_user.id}_portfolio_{unique_id}{ext}"
+            
+            file_gcs_object_name = f"portfolio/user_{current_user.id}_{unique_id}{ext}"
             try:
-                file_path = get_portfolio_upload_path(file_filename_to_save)
-                file.save(file_path)
-                print(f"Portfolio file saved to: {file_path}")
-            except Exception as e:
-                print(f"Error saving portfolio file: {e}")
+                bucket_name = current_app.config.get('GCS_BUCKET_NAME')
+                if not bucket_name: raise ValueError("GCS Bucket Name not configured")
+                bucket = storage_client.bucket(bucket_name)
+                blob = bucket.blob(file_gcs_object_name)
+
+                print(f"Uploading portfolio file to GCS: {file_gcs_object_name}")
+                blob.upload_from_file(file, content_type=file.content_type)
+
+            except Exception as e_upload:
+                print(f"Error uploading portfolio file to GCS: {e_upload}")
                 flash('Error uploading file. Please try again.', 'danger')
-                file_filename_to_save = None
+                file_gcs_object_name = None # Don't save DB record if upload fails
 
         assoc_step_id = request.form.get('associated_step_id', type=int)
         assoc_milestone_id = request.form.get('associated_milestone_id', type=int)
@@ -1193,15 +1219,16 @@ def add_portfolio_item():
             description=form.description.data,
             item_type=form.item_type.data,
             link_url=link_url if link_url else None,
-            file_filename=file_filename_to_save,
+            file_filename=file_gcs_object_name,
             associated_step_id=assoc_step_id,
             associated_milestone_id=assoc_milestone_id
         )
         try:
-            db.session.add(new_item)
-            db.session.commit()
-            flash('Portfolio item added successfully!', 'success')
-            return redirect(url_for('portfolio'))
+            if file_gcs_object_name is not None or not form.item_file.data:
+                 db.session.add(new_item)
+                 db.session.commit()
+                 flash('Portfolio item added successfully!', 'success')
+                 return redirect(url_for('portfolio'))
         except Exception as e:
             db.session.rollback()
             print(f"Error adding portfolio item to DB: {e}")
@@ -1226,126 +1253,181 @@ def add_portfolio_item():
                           is_homepage=False,
                           body_class='in-app-layout')
 
+
 @app.route('/portfolio/<int:item_id>/edit', methods=['GET', 'POST'])
 @login_required
-@plan_required('Starter', 'Pro')
 def edit_portfolio_item(item_id):
-    """Handles editing an existing portfolio item."""
+    """Handles editing an existing portfolio item, using GCS for files."""
     item = PortfolioItem.query.get_or_404(item_id)
     if item.user_id != current_user.id:
         abort(403)
 
     form = PortfolioItemForm(obj=item)
+    linked_name = None
+    if request.method == 'GET':
+        if item.associated_step: linked_name = f"Step: {item.associated_step.name}"
+        elif item.associated_milestone: linked_name = f"Milestone: {item.associated_milestone.name}"
 
     if form.validate_on_submit():
-        file_filename_to_save = item.file_filename
-        old_filename_to_delete = None
+        # --- Handle File Upload/Replacement using GCS ---
+        gcs_object_name_to_save = item.file_filename # Keep existing GCS object name by default
+        old_gcs_object_name_to_delete = None
 
-        if form.item_file.data:
+        if form.item_file.data: # If a new file is provided
+            # Mark old GCS object for potential deletion
             if item.file_filename:
-                old_filename_to_delete = item.file_filename
+                old_gcs_object_name_to_delete = item.file_filename
 
+            # Prepare new file details
             file = form.item_file.data
             base_filename = secure_filename(file.filename)
             unique_id = uuid.uuid4().hex
             name, ext = os.path.splitext(base_filename)
             ext = ext.lower()
             name = name[:100]
-            file_filename_to_save = f"user_{current_user.id}_portfolio_{unique_id}{ext}"
-            try:
-                file_path = get_portfolio_upload_path(file_filename_to_save)
-                file.save(file_path)
-                print(f"Updated portfolio file saved to: {file_path}")
-            except Exception as e:
-                print(f"Error saving updated portfolio file: {e}")
-                flash('Error uploading new file. Please try again.', 'danger')
-                file_filename_to_save = item.file_filename
-                old_filename_to_delete = None
+            new_gcs_object_name = f"portfolio/user_{current_user.id}_{unique_id}{ext}"
 
+            try:
+                bucket_name = current_app.config.get('GCS_BUCKET_NAME')
+                if not bucket_name: raise ValueError("GCS Bucket Name not configured")
+                bucket = storage_client.bucket(bucket_name)
+                blob = bucket.blob(new_gcs_object_name)
+
+                print(f"Uploading updated portfolio file to GCS: {new_gcs_object_name}")
+                blob.upload_from_file(file, content_type=file.content_type)
+
+                # If upload succeeds, set the new name to be saved in DB
+                gcs_object_name_to_save = new_gcs_object_name
+
+            except Exception as e_upload:
+                print(f"Error saving updated portfolio file to GCS: {e_upload}")
+                flash('Error uploading new file. Please try again.', 'danger')
+                # If upload fails, keep the old DB record and don't delete the old file
+                gcs_object_name_to_save = item.file_filename
+                old_gcs_object_name_to_delete = None
+        # --- End GCS File Handling ---
+
+        # Update other item fields from form
         item.title = form.title.data
         item.description = form.description.data
         item.item_type = form.item_type.data
         item.link_url = form.link_url.data if form.link_url.data else None
-        item.file_filename = file_filename_to_save
+        item.file_filename = gcs_object_name_to_save # Save new or keep old GCS object name
+
+        # We are NOT changing step/milestone association via this form currently
+        # item.associated_step_id = ...
+        # item.associated_milestone_id = ...
 
         try:
-            db.session.commit()
+            db.session.commit() # Commit DB changes
             flash('Portfolio item updated successfully!', 'success')
 
-            if old_filename_to_delete:
+            # --- Delete old GCS file AFTER successful DB commit ---
+            if old_gcs_object_name_to_delete:
                 try:
-                    old_file_path = get_portfolio_upload_path(old_filename_to_delete)
-                    if os.path.exists(old_file_path):
-                        os.remove(old_file_path)
-                        print(f"Deleted old portfolio file: {old_file_path}")
-                except OSError as e:
-                    print(f"Error deleting old portfolio file {old_file_path}: {e}")
+                    print(f"Attempting to delete old GCS file: {old_gcs_object_name_to_delete}")
+                    bucket_name = current_app.config.get('GCS_BUCKET_NAME')
+                    bucket = storage_client.bucket(bucket_name)
+                    old_blob = bucket.blob(old_gcs_object_name_to_delete)
+                    if old_blob.exists():
+                         old_blob.delete()
+                         print(f"Deleted old portfolio file from GCS.")
+                    else:
+                         print("Old GCS file not found, skipping delete.")
+                except Exception as e_del:
+                     # Log error but don't fail the whole request
+                     print(f"Error deleting old portfolio file from GCS {old_gcs_object_name_to_delete}: {e_del}")
+                     flash("Item updated, but failed to delete old file from storage.", "warning")
+            # --- End Delete Old GCS File ---
 
-            return redirect(url_for('portfolio'))
+            return redirect(url_for('portfolio')) # Redirect to portfolio list
+
         except Exception as e:
             db.session.rollback()
-            print(f"Error updating portfolio item {item_id}: {e}")
+            print(f"Error updating portfolio item DB {item_id}: {e}")
             flash('Error updating portfolio item. Please try again.', 'danger')
 
-    return render_template('add_edit_portfolio_item.html', title='Edit Portfolio Item', form=form, is_edit=True, item=item, is_homepage=False, body_class='in-app-layout')
+    # Render edit form on GET or if validation fails
+    return render_template('add_edit_portfolio_item.html',
+                           title='Edit Portfolio Item',
+                           form=form,
+                           is_edit=True,
+                           item=item,
+                           linked_name=linked_name,
+                           is_homepage=False,
+                           body_class='in-app-layout')
 
 @app.route('/portfolio/<int:item_id>/delete', methods=['POST'])
 @login_required
-@plan_required('Starter', 'Pro')
 def delete_portfolio_item(item_id):
-    """Handles deleting a portfolio item."""
+    """Deletes a portfolio item from DB and associated file from GCS."""
     item = PortfolioItem.query.get_or_404(item_id)
-    if item.user_id != current_user.id:
-        abort(403)
+    if item.user_id != current_user.id: abort(403)
 
-    filename_to_delete = item.file_filename
+    gcs_object_name = item.file_filename # Get GCS object name before deleting DB record
 
     try:
+        # Delete DB record first
         db.session.delete(item)
         db.session.commit()
 
-        if filename_to_delete:
+        # Delete associated file from GCS AFTER successful DB deletion
+        if gcs_object_name:
             try:
-                file_path = get_portfolio_upload_path(filename_to_delete)
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    print(f"Deleted portfolio file: {file_path}")
-            except OSError as e:
-                print(f"Error deleting portfolio file {file_path}: {e}")
+                bucket_name = current_app.config.get('GCS_BUCKET_NAME')
+                if not bucket_name: raise ValueError("GCS Bucket Name not configured")
+                bucket = storage_client.bucket(bucket_name)
+                blob = bucket.blob(gcs_object_name)
+                if blob.exists():
+                    blob.delete()
+                    print(f"Deleted portfolio file from GCS: {gcs_object_name}")
+            except Exception as e_gcs:
+                # Log error but don't rollback DB delete
+                print(f"Error deleting portfolio file from GCS {gcs_object_name}: {e_gcs}")
+                flash("Portfolio item deleted, but associated file might remain in storage.", "warning")
 
         flash('Portfolio item deleted successfully.', 'success')
     except Exception as e:
         db.session.rollback()
         print(f"Error deleting portfolio item {item_id}: {e}")
-        flash('Error deleting portfolio item. Please try again.', 'danger')
+        flash('Error deleting portfolio item.', 'danger')
 
     return redirect(url_for('portfolio'))
 
 # --- NEW Portfolio File Download Route ---
 @app.route('/portfolio/download/<int:item_id>')
 @login_required
-@plan_required('Starter', 'Pro')
 def download_portfolio_file(item_id):
-    """Provides download access to an uploaded portfolio file, checking ownership."""
+    """Generates a signed URL to download an uploaded portfolio file from GCS."""
     item = PortfolioItem.query.get_or_404(item_id)
-
-    if item.user_id != current_user.id:
-        abort(403)
-
-    if not item.file_filename:
-        flash("No downloadable file associated with this portfolio item.", "warning")
-        return redirect(url_for('portfolio'))
-
-    portfolio_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'portfolio')
-    filename = item.file_filename
+    if item.user_id != current_user.id: abort(403)
+    gcs_object_name = item.file_filename
+    if not gcs_object_name:
+        flash("No downloadable file associated with this item.", "warning")
+        return redirect(url_for('portfolio')) # Maybe redirect to edit page?
 
     try:
-        return send_from_directory(portfolio_dir, filename, as_attachment=True)
-    except FileNotFoundError:
-        abort(404)
+        bucket_name = current_app.config.get('GCS_BUCKET_NAME')
+        if not bucket_name: raise ValueError("GCS Bucket Name not configured")
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(gcs_object_name)
+
+        if not blob.exists():
+            flash("Error: Portfolio file not found in storage.", "danger")
+            # Optionally clear bad filename? item.file_filename = None; db.session.commit()
+            return redirect(url_for('edit_portfolio_item', item_id=item.id))
+
+        signed_url = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(minutes=15),
+            method="GET"
+        )
+        return redirect(signed_url)
+
     except Exception as e:
-        print(f"Error sending portfolio file {filename}: {e}")
-        abort(500)
+        print(f"Error generating signed URL for portfolio item {item_id} ({gcs_object_name}): {e}")
+        flash("Could not generate download link.", "danger")
+        return redirect(url_for('edit_portfolio_item', item_id=item.id))
 
 # --- NEW Pricing Page Route ---
 @app.route('/pricing')
@@ -1390,20 +1472,30 @@ def profile():
                 name, ext = os.path.splitext(base_filename)
                 ext = ext.lower()
                 name = name[:100]
-                cv_filename_to_save = f"user_{current_user.id}_{unique_id}{ext}"
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], cv_filename_to_save)
+                cv_gcs_object_name = f"cvs/user_{current_user.id}_{unique_id}{ext}"
 
-                if current_user.cv_filename and current_user.cv_filename != cv_filename_to_save:
-                    old_path = os.path.join(app.config['UPLOAD_FOLDER'], current_user.cv_filename)
-                    if os.path.exists(old_path):
-                        try:
-                            os.remove(old_path)
-                            print(f"Removed old CV during profile update: {old_path}")
-                        except OSError as e:
-                            print(f"Error removing old CV {old_path}: {e}")
+                try:
+                    bucket_name = current_app.config.get('GCS_BUCKET_NAME')
+                    if not bucket_name: raise ValueError("GCS Bucket Name not configured")
+                    bucket = storage_client.bucket(bucket_name)
+                    blob = bucket.blob(cv_gcs_object_name)
 
-                file.save(file_path)
-                print(f"New CV saved via profile to: {file_path}")
+                    if current_user.cv_filename and current_user.cv_filename != cv_gcs_object_name:
+                       try:
+                           old_blob = bucket.blob(current_user.cv_filename)
+                           if old_blob.exists(): # Check if it exists before deleting
+                               old_blob.delete()
+                               print(f"Deleted old CV from GCS: {current_user.cv_filename}")
+                       except Exception as e_del:
+                            print(f"Error deleting old CV from GCS {current_user.cv_filename}: {e_del}") # Log but continue
+
+                    print(f"Uploading new CV to GCS: {cv_gcs_object_name}")
+                    blob.upload_from_file(file, content_type=file.content_type)
+
+                except Exception as e_upload:
+                    print(f"Error uploading CV to GCS: {e_upload}")
+                    flash('Error uploading new CV file. Please try again.', 'danger')
+                    cv_gcs_object_name = current_user.cv_filename # Revert to old name if upload fails
 
             current_user.first_name = form.first_name.data
             current_user.last_name = form.last_name.data
@@ -1413,7 +1505,7 @@ def profile():
             current_user.time_commitment = form.time_commitment.data
             current_user.interests = form.interests.data
             current_user.learning_style = form.learning_style.data if form.learning_style.data else None
-            current_user.cv_filename = cv_filename_to_save
+            current_user.cv_filename = cv_gcs_object_name
 
             current_user.onboarding_complete = True
 
@@ -1539,59 +1631,77 @@ def toggle_step_status(step_id):
 @app.route('/cv-download')
 @login_required
 def download_cv():
-    """Allows the user to download their uploaded CV."""
-    if not current_user.cv_filename:
+    """Generates a signed URL to download the user's CV from GCS."""
+    gcs_object_name = current_user.cv_filename
+    if not gcs_object_name:
         flash("No CV uploaded.", "warning")
         return redirect(url_for('profile'))
 
-    cv_directory = app.config['UPLOAD_FOLDER']
-    filename = current_user.cv_filename
-
     try:
-        return send_from_directory(cv_directory, filename, as_attachment=True)
-    except FileNotFoundError:
-        flash("Error: Your CV file was not found on the server. Please upload it again.", "danger")
-        return redirect(url_for('profile'))
+        bucket_name = current_app.config.get('GCS_BUCKET_NAME')
+        if not bucket_name: raise ValueError("GCS Bucket Name not configured")
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(gcs_object_name)
+
+        if not blob.exists():
+            flash("Error: Your CV file was not found in storage. Please upload it again.", "danger")
+            # Optionally clear the bad filename from DB
+            # current_user.cv_filename = None; db.session.commit()
+            return redirect(url_for('profile'))
+
+        # Generate a signed URL valid for 15 minutes
+        signed_url = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(minutes=15),
+            method="GET"
+        )
+        print(f"DEBUG: Generated GCS signed URL for CV: {signed_url}")
+        return redirect(signed_url) # Redirect browser to the GCS URL
+
     except Exception as e:
-        print(f"Error sending CV file {filename} for user {current_user.id}: {e}")
-        flash("An error occurred while trying to download your CV.", "danger")
+        print(f"Error generating signed URL for CV {gcs_object_name}: {e}")
+        flash("Could not generate download link for CV.", "danger")
         return redirect(url_for('profile'))
 
 # --- NEW CV Delete Route ---
 @app.route('/cv-delete', methods=['POST'])
 @login_required
 def delete_cv():
-    """Deletes the user's uploaded CV."""
-    filename_to_delete = current_user.cv_filename
-
-    if not filename_to_delete:
+    """Deletes the user's uploaded CV from GCS and DB."""
+    gcs_object_name = current_user.cv_filename
+    if not gcs_object_name:
         flash("No CV to delete.", "info")
         return redirect(url_for('profile'))
 
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename_to_delete)
-
     try:
-        if os.path.exists(file_path):
-            os.remove(file_path)
-            print(f"Deleted CV file: {file_path}")
-        else:
-            print(f"CV file not found for deletion, but clearing DB record: {file_path}")
+        # Attempt to delete from GCS first
+        try:
+            bucket_name = current_app.config.get('GCS_BUCKET_NAME')
+            if not bucket_name: raise ValueError("GCS Bucket Name not configured")
+            bucket = storage_client.bucket(bucket_name)
+            blob = bucket.blob(gcs_object_name)
+            if blob.exists():
+                blob.delete()
+                print(f"Deleted CV from GCS: {gcs_object_name}")
+            else:
+                print(f"CV file not found in GCS, clearing DB record: {gcs_object_name}")
+        except Exception as e_gcs:
+            # Log error but proceed to clear DB ref anyway? Or stop?
+            # Let's log and proceed to clear DB ref to avoid orphaned refs
+            print(f"Error deleting CV from GCS {gcs_object_name}: {e_gcs}")
+            flash("Could not delete file from storage, but removing reference.", "warning")
 
+        # Clear filename reference in database
         current_user.cv_filename = None
         db.session.commit()
         flash("CV deleted successfully.", "success")
 
-    except OSError as e:
-        db.session.rollback()
-        print(f"Error deleting CV file {file_path}: {e}")
-        flash("An error occurred while deleting the CV file.", "danger")
     except Exception as e:
         db.session.rollback()
         print(f"Error clearing CV filename in DB for user {current_user.id}: {e}")
-        flash("An error occurred while updating your profile after CV deletion.", "danger")
+        flash("An error occurred while removing the CV reference.", "danger")
 
     return redirect(url_for('profile'))
-
 
 # --- NEW Interview Prep Route ---
 @app.route('/interview-prep')
