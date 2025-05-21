@@ -28,6 +28,7 @@ from werkzeug.security import generate_password_hash
 import secrets
 from werkzeug.middleware.proxy_fix import ProxyFix
 from google.cloud import storage
+from google.cloud import exceptions as google_exceptions # Import for GCS exceptions
 
 # --- NEW Email Sending Helper (using Brevo API) ---
 def send_email(to, subject, template_prefix, **kwargs):
@@ -225,14 +226,33 @@ load_dotenv()
 
 app = Flask(__name__)
 
-storage_client = storage.Client()
+# Initialize GCS client with error handling
+try:
+    storage_client = storage.Client()
+    print(f"INFO: GCS client initialized successfully for project: {storage_client.project}")
+except google_exceptions.GoogleCloudError as e:
+    print(f"CRITICAL: Failed to initialize Google Cloud Storage client. Error: {e}. This might be due to missing credentials, incorrect project configuration, or network issues. Ensure 'GOOGLE_APPLICATION_CREDENTIALS' is set correctly if running locally, or that the service account has 'Storage Admin' or relevant GCS permissions if running on Google Cloud.")
+    storage_client = None
+except Exception as e:
+    print(f"CRITICAL: An unexpected error occurred during GCS client initialization: {e}")
+    storage_client = None
+
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # --- Configuration ---
 
 app.config['GCS_BUCKET_NAME'] = os.environ.get('GCS_BUCKET_NAME')
-if not app.config['GCS_BUCKET_NAME']:
-    print("WARNING: GCS_BUCKET_NAME not configured.")
+gcs_bucket_name = app.config.get('GCS_BUCKET_NAME')
+if gcs_bucket_name:
+    print(f"INFO: GCS_BUCKET_NAME is configured to: '{gcs_bucket_name}'")
+else:
+    print("WARNING: GCS_BUCKET_NAME is not set in the environment. File upload/download features relying on GCS will not work.")
+
+google_app_creds = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
+if google_app_creds:
+    print(f"INFO: GOOGLE_APPLICATION_CREDENTIALS environment variable is set to: '{google_app_creds}'. This will be used for GCS authentication.")
+else:
+    print("INFO: GOOGLE_APPLICATION_CREDENTIALS environment variable is not set. Using default credentials for GCS authentication (e.g., service account on Google Cloud, or gcloud CLI default).")
     
 
 app.config['GOOGLE_OAUTH_CLIENT_ID'] = os.environ.get('GOOGLE_OAUTH_CLIENT_ID')
@@ -1001,29 +1021,47 @@ def onboarding_form():
                 ext = ext.lower()
                 name = name[:100]
                 # Define object name/path within the bucket (e.g., using a 'cvs/' prefix)
-                gcs_object_name = f"cvs/user_{current_user.id}_{unique_id}{ext}"
+                gcs_object_name = f"cvs/user_{current_user.id}_{unique_id}{ext}" # Define gcs_object_name before try block for logging scope
 
-                try:
+                if not storage_client:
+                    print("ERROR: GCS client not available in onboarding_form. CV upload skipped.")
+                    flash('Cloud storage service is currently unavailable. CV could not be uploaded.', 'danger')
+                    gcs_object_name = current_user.cv_filename # Revert to existing CV if any
+                else:
                     bucket_name = current_app.config.get('GCS_BUCKET_NAME')
-                    if not bucket_name: raise ValueError("GCS Bucket Name not configured")
-                    bucket = storage_client.bucket(bucket_name)
-                    blob = bucket.blob(gcs_object_name)
+                    if not bucket_name:
+                        print("ERROR: GCS_BUCKET_NAME not configured in onboarding_form. CV upload skipped.")
+                        flash('Cloud storage is not properly configured. CV could not be uploaded.', 'danger')
+                        gcs_object_name = current_user.cv_filename # Revert to existing CV
+                    else:
+                        try:
+                            bucket = storage_client.bucket(bucket_name)
+                            blob = bucket.blob(gcs_object_name)
+                            # Optional: Delete old CV if it exists and this is an update (though typically for profile edit)
+                            # if current_user.cv_filename and current_user.cv_filename != gcs_object_name:
+                            #     try:
+                            #         old_blob = bucket.blob(current_user.cv_filename)
+                            #         if old_blob.exists(): # Check before deleting
+                            #             old_blob.delete()
+                            #             print(f"INFO: Deleted old CV from GCS: {current_user.cv_filename} during onboarding update.")
+                            #     except google_exceptions.GoogleCloudError as e_del:
+                            #         print(f"ERROR: GCS failed to delete old CV '{current_user.cv_filename}'. Bucket: '{bucket_name}'. Error: {e_del}")
+                            #         # Non-critical, proceed with new upload
+                            #     except Exception as e_del_unexpected:
+                            #         print(f"ERROR: Unexpected error deleting old CV '{current_user.cv_filename}'. Error: {e_del_unexpected}")
 
-                    # NOTE: Deleting old CV usually happens on Profile edit, not initial onboarding.
-                    # If you wanted to delete here if one existed:
-                    # if current_user.cv_filename:
-                    #    try:
-                    #        old_blob = bucket.blob(current_user.cv_filename)
-                    #        if old_blob.exists(): old_blob.delete()
-                    #    except Exception as e_del: print(f"Error deleting old CV from GCS: {e_del}")
+                            print(f"INFO: Attempting to upload CV to GCS: {gcs_object_name}, Bucket: {bucket_name}")
+                            blob.upload_from_file(file, content_type=file.content_type)
+                            print(f"INFO: CV successfully uploaded to GCS: {gcs_object_name}")
 
-                    print(f"Uploading CV to GCS: {gcs_object_name}")
-                    blob.upload_from_file(file, content_type=file.content_type)
-
-                except Exception as e_upload:
-                    print(f"Error uploading CV to GCS: {e_upload}")
-                    flash('Error uploading CV file. Please try again.', 'danger')
-                    gcs_object_name = current_user.cv_filename # Revert to old name if upload fails
+                        except google_exceptions.GoogleCloudError as e_gcs:
+                            print(f"ERROR: GCS CV upload failed. Bucket: '{bucket_name}', Object: '{gcs_object_name}'. Error: {e_gcs}")
+                            flash('Failed to upload CV due to a cloud storage error. Please try again.', 'danger')
+                            gcs_object_name = current_user.cv_filename # Revert to old name
+                        except Exception as e_unexpected:
+                            print(f"ERROR: Unexpected error during CV GCS upload. Object: '{gcs_object_name}'. Error: {e_unexpected}")
+                            flash('An unexpected error occurred during CV upload. Please try again.', 'danger')
+                            gcs_object_name = current_user.cv_filename # Revert to old name
 
             # --- Update User Object ---
             current_user.target_career_path = form.target_career_path.data
@@ -1194,21 +1232,45 @@ def add_portfolio_item():
             name, ext = os.path.splitext(base_filename)
             ext = ext.lower()
             name = name[:100]
-            
-            file_gcs_object_name = f"portfolio/user_{current_user.id}_{unique_id}{ext}"
-            try:
-                bucket_name = current_app.config.get('GCS_BUCKET_NAME')
-                if not bucket_name: raise ValueError("GCS Bucket Name not configured")
-                bucket = storage_client.bucket(bucket_name)
-                blob = bucket.blob(file_gcs_object_name)
+            file_gcs_object_name = None # Initialize to None
+            if form.item_file.data: # Only proceed if a file was actually submitted
+                file = form.item_file.data
+                base_filename = secure_filename(file.filename)
+                unique_id = uuid.uuid4().hex
+                name, ext = os.path.splitext(base_filename)
+                ext = ext.lower()
+                name = name[:100]
+                # Define GCS object name (used for logging even if upload fails)
+                intended_gcs_object_name = f"portfolio/user_{current_user.id}_{unique_id}{ext}"
 
-                print(f"Uploading portfolio file to GCS: {file_gcs_object_name}")
-                blob.upload_from_file(file, content_type=file.content_type)
-
-            except Exception as e_upload:
-                print(f"Error uploading portfolio file to GCS: {e_upload}")
-                flash('Error uploading file. Please try again.', 'danger')
-                file_gcs_object_name = None # Don't save DB record if upload fails
+                if not storage_client:
+                    print(f"ERROR: GCS client not available in add_portfolio_item for object {intended_gcs_object_name}. File upload skipped.")
+                    flash('Cloud storage service is currently unavailable. Portfolio file could not be uploaded.', 'danger')
+                    # file_gcs_object_name remains None
+                else:
+                    bucket_name = current_app.config.get('GCS_BUCKET_NAME')
+                    if not bucket_name:
+                        print(f"ERROR: GCS_BUCKET_NAME not configured in add_portfolio_item for object {intended_gcs_object_name}. File upload skipped.")
+                        flash('Cloud storage is not properly configured. Portfolio file could not be uploaded.', 'danger')
+                        # file_gcs_object_name remains None
+                    else:
+                        try:
+                            bucket = storage_client.bucket(bucket_name)
+                            blob = bucket.blob(intended_gcs_object_name)
+                            print(f"INFO: Attempting to upload portfolio file to GCS: {intended_gcs_object_name}, Bucket: {bucket_name}")
+                            blob.upload_from_file(file, content_type=file.content_type)
+                            print(f"INFO: Portfolio file successfully uploaded to GCS: {intended_gcs_object_name}")
+                            file_gcs_object_name = intended_gcs_object_name # Set to actual name on success
+                        except google_exceptions.GoogleCloudError as e_gcs:
+                            print(f"ERROR: GCS portfolio file upload failed. Bucket: '{bucket_name}', Object: '{intended_gcs_object_name}'. Error: {e_gcs}")
+                            flash('Failed to upload portfolio file due to a cloud storage error. Please try again.', 'danger')
+                            # file_gcs_object_name remains None
+                        except Exception as e_unexpected:
+                            print(f"ERROR: Unexpected error during portfolio GCS upload. Object: '{intended_gcs_object_name}'. Error: {e_unexpected}")
+                            flash('An unexpected error occurred during portfolio file upload. Please try again.', 'danger')
+                            # file_gcs_object_name remains None
+            # If file_gcs_object_name is still None here, it means either no file was uploaded or upload failed.
+            # The DB logic below handles this by only saving a filename if it's not None.
 
         assoc_step_id = request.form.get('associated_step_id', type=int)
         assoc_milestone_id = request.form.get('associated_milestone_id', type=int)
@@ -1285,26 +1347,39 @@ def edit_portfolio_item(item_id):
             name, ext = os.path.splitext(base_filename)
             ext = ext.lower()
             name = name[:100]
-            new_gcs_object_name = f"portfolio/user_{current_user.id}_{unique_id}{ext}"
+            new_gcs_object_name = f"portfolio/user_{current_user.id}_{unique_id}{ext}" # Define for logging scope
 
-            try:
+            if not storage_client:
+                print(f"ERROR: GCS client not available in edit_portfolio_item for object {new_gcs_object_name}. File upload skipped.")
+                flash('Cloud storage service is currently unavailable. Portfolio file update failed.', 'danger')
+                gcs_object_name_to_save = item.file_filename # Keep old filename
+                old_gcs_object_name_to_delete = None # Don't delete old file if new one fails due to client issue
+            else:
                 bucket_name = current_app.config.get('GCS_BUCKET_NAME')
-                if not bucket_name: raise ValueError("GCS Bucket Name not configured")
-                bucket = storage_client.bucket(bucket_name)
-                blob = bucket.blob(new_gcs_object_name)
-
-                print(f"Uploading updated portfolio file to GCS: {new_gcs_object_name}")
-                blob.upload_from_file(file, content_type=file.content_type)
-
-                # If upload succeeds, set the new name to be saved in DB
-                gcs_object_name_to_save = new_gcs_object_name
-
-            except Exception as e_upload:
-                print(f"Error saving updated portfolio file to GCS: {e_upload}")
-                flash('Error uploading new file. Please try again.', 'danger')
-                # If upload fails, keep the old DB record and don't delete the old file
-                gcs_object_name_to_save = item.file_filename
-                old_gcs_object_name_to_delete = None
+                if not bucket_name:
+                    print(f"ERROR: GCS_BUCKET_NAME not configured in edit_portfolio_item for object {new_gcs_object_name}. File upload skipped.")
+                    flash('Cloud storage is not properly configured. Portfolio file update failed.', 'danger')
+                    gcs_object_name_to_save = item.file_filename # Keep old filename
+                    old_gcs_object_name_to_delete = None # Don't delete
+                else:
+                    try:
+                        bucket = storage_client.bucket(bucket_name)
+                        blob = bucket.blob(new_gcs_object_name)
+                        print(f"INFO: Attempting to upload updated portfolio file to GCS: {new_gcs_object_name}, Bucket: {bucket_name}")
+                        blob.upload_from_file(file, content_type=file.content_type)
+                        print(f"INFO: Updated portfolio file successfully uploaded to GCS: {new_gcs_object_name}")
+                        gcs_object_name_to_save = new_gcs_object_name # Set to new name on success
+                        # old_gcs_object_name_to_delete was already set if item.file_filename existed
+                    except google_exceptions.GoogleCloudError as e_gcs:
+                        print(f"ERROR: GCS portfolio file update failed. Bucket: '{bucket_name}', Object: '{new_gcs_object_name}'. Error: {e_gcs}")
+                        flash('Failed to update portfolio file due to a cloud storage error. Please try again.', 'danger')
+                        gcs_object_name_to_save = item.file_filename # Revert to old name
+                        old_gcs_object_name_to_delete = None # Don't delete the old file if new upload failed
+                    except Exception as e_unexpected:
+                        print(f"ERROR: Unexpected error during portfolio GCS update. Object: '{new_gcs_object_name}'. Error: {e_unexpected}")
+                        flash('An unexpected error occurred during portfolio file update. Please try again.', 'danger')
+                        gcs_object_name_to_save = item.file_filename # Revert
+                        old_gcs_object_name_to_delete = None # Don't delete
         # --- End GCS File Handling ---
 
         # Update other item fields from form
@@ -1323,21 +1398,31 @@ def edit_portfolio_item(item_id):
             flash('Portfolio item updated successfully!', 'success')
 
             # --- Delete old GCS file AFTER successful DB commit ---
-            if old_gcs_object_name_to_delete:
-                try:
-                    print(f"Attempting to delete old GCS file: {old_gcs_object_name_to_delete}")
+            if old_gcs_object_name_to_delete: # This implies new upload was successful or not attempted, and an old file exists
+                if not storage_client:
+                    print(f"ERROR: GCS client not available in edit_portfolio_item for deleting old file {old_gcs_object_name_to_delete}. Deletion skipped.")
+                    flash('Cloud storage service is currently unavailable. Old portfolio file may not have been deleted.', 'warning')
+                else:
                     bucket_name = current_app.config.get('GCS_BUCKET_NAME')
-                    bucket = storage_client.bucket(bucket_name)
-                    old_blob = bucket.blob(old_gcs_object_name_to_delete)
-                    if old_blob.exists():
-                         old_blob.delete()
-                         print(f"Deleted old portfolio file from GCS.")
+                    if not bucket_name:
+                        print(f"ERROR: GCS_BUCKET_NAME not configured in edit_portfolio_item for deleting old file {old_gcs_object_name_to_delete}. Deletion skipped.")
+                        flash('Cloud storage is not properly configured. Old portfolio file may not have been deleted.', 'warning')
                     else:
-                         print("Old GCS file not found, skipping delete.")
-                except Exception as e_del:
-                     # Log error but don't fail the whole request
-                     print(f"Error deleting old portfolio file from GCS {old_gcs_object_name_to_delete}: {e_del}")
-                     flash("Item updated, but failed to delete old file from storage.", "warning")
+                        try:
+                            print(f"INFO: Attempting to delete old GCS file: {old_gcs_object_name_to_delete}, Bucket: {bucket_name}")
+                            bucket = storage_client.bucket(bucket_name)
+                            old_blob = bucket.blob(old_gcs_object_name_to_delete)
+                            if old_blob.exists(): # Check existence before deleting
+                                old_blob.delete()
+                                print(f"INFO: Successfully deleted old portfolio file from GCS: {old_gcs_object_name_to_delete}")
+                            else:
+                                print(f"INFO: Old GCS portfolio file not found, skipping delete: {old_gcs_object_name_to_delete}")
+                        except google_exceptions.GoogleCloudError as e_gcs_del:
+                            print(f"ERROR: GCS failed to delete old portfolio file '{old_gcs_object_name_to_delete}'. Bucket: '{bucket_name}'. Error: {e_gcs_del}")
+                            flash('Portfolio item updated, but failed to delete the old associated file from cloud storage.', 'warning')
+                        except Exception as e_del_unexpected:
+                            print(f"ERROR: Unexpected error deleting old portfolio file '{old_gcs_object_name_to_delete}'. Error: {e_del_unexpected}")
+                            flash('Portfolio item updated, but an unexpected error occurred while deleting the old file.', 'warning')
             # --- End Delete Old GCS File ---
 
             return redirect(url_for('portfolio')) # Redirect to portfolio list
@@ -1372,20 +1457,32 @@ def delete_portfolio_item(item_id):
         db.session.commit()
 
         # Delete associated file from GCS AFTER successful DB deletion
-        if gcs_object_name:
-            try:
+        if gcs_object_name: # If there was a filename associated with the DB record
+            if not storage_client:
+                print(f"ERROR: GCS client not available in delete_portfolio_item for object {gcs_object_name}. Deletion from GCS skipped.")
+                flash("Portfolio item deleted from database, but associated file might remain in cloud storage due to a service issue.", "warning")
+            else:
                 bucket_name = current_app.config.get('GCS_BUCKET_NAME')
-                if not bucket_name: raise ValueError("GCS Bucket Name not configured")
-                bucket = storage_client.bucket(bucket_name)
-                blob = bucket.blob(gcs_object_name)
-                if blob.exists():
-                    blob.delete()
-                    print(f"Deleted portfolio file from GCS: {gcs_object_name}")
-            except Exception as e_gcs:
-                # Log error but don't rollback DB delete
-                print(f"Error deleting portfolio file from GCS {gcs_object_name}: {e_gcs}")
-                flash("Portfolio item deleted, but associated file might remain in storage.", "warning")
-
+                if not bucket_name:
+                    print(f"ERROR: GCS_BUCKET_NAME not configured in delete_portfolio_item for object {gcs_object_name}. Deletion from GCS skipped.")
+                    flash("Portfolio item deleted from database, but associated file might remain in cloud storage due to configuration issue.", "warning")
+                else:
+                    try:
+                        print(f"INFO: Attempting to delete portfolio file from GCS: {gcs_object_name}, Bucket: {bucket_name}")
+                        bucket = storage_client.bucket(bucket_name)
+                        blob = bucket.blob(gcs_object_name)
+                        if blob.exists(): # Check existence before deleting
+                            blob.delete()
+                            print(f"INFO: Successfully deleted portfolio file from GCS: {gcs_object_name}")
+                        else:
+                            print(f"INFO: Portfolio file not found in GCS, no deletion needed: {gcs_object_name}")
+                    except google_exceptions.GoogleCloudError as e_gcs:
+                        print(f"ERROR: GCS failed to delete portfolio file '{gcs_object_name}'. Bucket: '{bucket_name}'. Error: {e_gcs}")
+                        flash("Portfolio item deleted from database, but associated file could not be removed from cloud storage. Please contact support if it persists.", "warning")
+                    except Exception as e_unexpected:
+                        print(f"ERROR: Unexpected error deleting portfolio file '{gcs_object_name}' from GCS. Error: {e_unexpected}")
+                        flash("Portfolio item deleted from database, but an unexpected error occurred removing the file from cloud storage.", "warning")
+        
         flash('Portfolio item deleted successfully.', 'success')
     except Exception as e:
         db.session.rollback()
@@ -1403,30 +1500,48 @@ def download_portfolio_file(item_id):
     if item.user_id != current_user.id: abort(403)
     gcs_object_name = item.file_filename
     if not gcs_object_name:
-        flash("No downloadable file associated with this item.", "warning")
-        return redirect(url_for('portfolio')) # Maybe redirect to edit page?
+        flash("No downloadable file associated with this portfolio item.", "warning")
+        return redirect(url_for('portfolio'))
+
+    if not storage_client:
+        print(f"ERROR: GCS client not available in download_portfolio_file for object {gcs_object_name}. Download link generation failed.")
+        flash('Cloud storage service is currently unavailable. Could not generate download link.', 'danger')
+        return redirect(url_for('edit_portfolio_item', item_id=item.id))
+
+    bucket_name = current_app.config.get('GCS_BUCKET_NAME')
+    if not bucket_name:
+        print(f"ERROR: GCS_BUCKET_NAME not configured in download_portfolio_file for object {gcs_object_name}. Download link generation failed.")
+        flash('Cloud storage is not properly configured. Could not generate download link.', 'danger')
+        return redirect(url_for('edit_portfolio_item', item_id=item.id))
 
     try:
-        bucket_name = current_app.config.get('GCS_BUCKET_NAME')
-        if not bucket_name: raise ValueError("GCS Bucket Name not configured")
         bucket = storage_client.bucket(bucket_name)
         blob = bucket.blob(gcs_object_name)
 
+        print(f"INFO: Checking existence of portfolio object {gcs_object_name} in bucket {bucket_name} for download.")
         if not blob.exists():
-            flash("Error: Portfolio file not found in storage.", "danger")
-            # Optionally clear bad filename? item.file_filename = None; db.session.commit()
+            print(f"ERROR: Portfolio file not found in GCS: {gcs_object_name}. Cannot generate download link.")
+            flash("Error: Portfolio file not found in storage. It might have been deleted or moved.", "danger")
+            # Optionally clear bad filename from DB here if desired
+            # item.file_filename = None; db.session.commit()
             return redirect(url_for('edit_portfolio_item', item_id=item.id))
 
+        print(f"INFO: Generating signed URL for portfolio item {item_id} ({gcs_object_name}), Bucket: {bucket_name}")
         signed_url = blob.generate_signed_url(
             version="v4",
-            expiration=timedelta(minutes=15),
+            expiration=timedelta(minutes=15), # Short-lived URL
             method="GET"
         )
+        print(f"INFO: Successfully generated signed URL for {gcs_object_name}.")
         return redirect(signed_url)
 
-    except Exception as e:
-        print(f"Error generating signed URL for portfolio item {item_id} ({gcs_object_name}): {e}")
-        flash("Could not generate download link.", "danger")
+    except google_exceptions.GoogleCloudError as e_gcs:
+        print(f"ERROR: GCS operation failed while trying to generate download link for portfolio item {item_id} ('{gcs_object_name}'). Bucket: '{bucket_name}'. Error: {e_gcs}")
+        flash('Could not generate download link due to a cloud storage error. Please try again.', 'danger')
+        return redirect(url_for('edit_portfolio_item', item_id=item.id))
+    except Exception as e_unexpected:
+        print(f"ERROR: Unexpected error generating signed URL for portfolio item {item_id} ('{gcs_object_name}'). Error: {e_unexpected}")
+        flash('An unexpected error occurred while preparing the download link. Please try again.', 'danger')
         return redirect(url_for('edit_portfolio_item', item_id=item.id))
 
 # --- NEW Pricing Page Route ---
@@ -1472,40 +1587,85 @@ def profile():
                 name, ext = os.path.splitext(base_filename)
                 ext = ext.lower()
                 name = name[:100]
-                cv_gcs_object_name = f"cvs/user_{current_user.id}_{unique_id}{ext}"
+                # cv_gcs_object_name will store the name of the file to be saved to GCS.
+                # Initialize to current_user.cv_filename to keep the old one if upload fails or isn't attempted.
+                cv_gcs_object_name_to_save = current_user.cv_filename 
+                
+                if form.cv_upload.data: # A new CV file was submitted
+                    file = form.cv_upload.data
+                    base_filename = secure_filename(file.filename)
+                    unique_id = uuid.uuid4().hex
+                    name, ext = os.path.splitext(base_filename)
+                    ext = ext.lower()
+                    name = name[:100]
+                    # This is the name for the new CV if upload is successful
+                    new_cv_gcs_object_name = f"cvs/user_{current_user.id}_{unique_id}{ext}"
 
-                try:
-                    bucket_name = current_app.config.get('GCS_BUCKET_NAME')
-                    if not bucket_name: raise ValueError("GCS Bucket Name not configured")
-                    bucket = storage_client.bucket(bucket_name)
-                    blob = bucket.blob(cv_gcs_object_name)
+                    if not storage_client:
+                        print(f"ERROR: GCS client not available in profile CV upload for {new_cv_gcs_object_name}. Upload skipped.")
+                        flash('Cloud storage service is currently unavailable. CV update failed.', 'danger')
+                        # cv_gcs_object_name_to_save remains current_user.cv_filename
+                    else:
+                        bucket_name = current_app.config.get('GCS_BUCKET_NAME')
+                        if not bucket_name:
+                            print(f"ERROR: GCS_BUCKET_NAME not configured in profile CV upload for {new_cv_gcs_object_name}. Upload skipped.")
+                            flash('Cloud storage is not properly configured. CV update failed.', 'danger')
+                            # cv_gcs_object_name_to_save remains current_user.cv_filename
+                        else:
+                            old_cv_to_delete_on_success = current_user.cv_filename if current_user.cv_filename and current_user.cv_filename != new_cv_gcs_object_name else None
+                            try:
+                                bucket = storage_client.bucket(bucket_name)
+                                blob = bucket.blob(new_cv_gcs_object_name)
 
-                    if current_user.cv_filename and current_user.cv_filename != cv_gcs_object_name:
-                       try:
-                           old_blob = bucket.blob(current_user.cv_filename)
-                           if old_blob.exists(): # Check if it exists before deleting
-                               old_blob.delete()
-                               print(f"Deleted old CV from GCS: {current_user.cv_filename}")
-                       except Exception as e_del:
-                            print(f"Error deleting old CV from GCS {current_user.cv_filename}: {e_del}") # Log but continue
+                                print(f"INFO: Attempting to upload new CV to GCS: {new_cv_gcs_object_name}, Bucket: {bucket_name}")
+                                blob.upload_from_file(file, content_type=file.content_type)
+                                print(f"INFO: New CV successfully uploaded: {new_cv_gcs_object_name}")
+                                cv_gcs_object_name_to_save = new_cv_gcs_object_name # Set to new CV name
 
-                    print(f"Uploading new CV to GCS: {cv_gcs_object_name}")
-                    blob.upload_from_file(file, content_type=file.content_type)
-
-                except Exception as e_upload:
-                    print(f"Error uploading CV to GCS: {e_upload}")
-                    flash('Error uploading new CV file. Please try again.', 'danger')
-                    cv_gcs_object_name = current_user.cv_filename # Revert to old name if upload fails
+                                # If new CV uploaded successfully, delete the old one (if different)
+                                if old_cv_to_delete_on_success:
+                                    try:
+                                        print(f"INFO: Attempting to delete old CV from GCS: {old_cv_to_delete_on_success}")
+                                        old_blob = bucket.blob(old_cv_to_delete_on_success)
+                                        if old_blob.exists():
+                                            old_blob.delete()
+                                            print(f"INFO: Successfully deleted old CV: {old_cv_to_delete_on_success}")
+                                        else:
+                                            print(f"INFO: Old CV {old_cv_to_delete_on_success} not found in GCS, skipping delete.")
+                                    except google_exceptions.GoogleCloudError as e_gcs_del:
+                                        print(f"ERROR: GCS failed to delete old CV '{old_cv_to_delete_on_success}'. Bucket: '{bucket_name}'. Error: {e_gcs_del}")
+                                        flash('New CV uploaded, but failed to delete the old CV from cloud storage.', 'warning')
+                                    except Exception as e_del_unexpected:
+                                        print(f"ERROR: Unexpected error deleting old CV '{old_cv_to_delete_on_success}'. Error: {e_del_unexpected}")
+                                        flash('New CV uploaded, but an unexpected error occurred while deleting the old CV.', 'warning')
+                            
+                            except google_exceptions.GoogleCloudError as e_gcs_upload:
+                                print(f"ERROR: GCS CV upload failed for new CV '{new_cv_gcs_object_name}'. Bucket: '{bucket_name}'. Error: {e_gcs_upload}")
+                                flash('Failed to upload new CV due to a cloud storage error. Previous CV (if any) is retained.', 'danger')
+                                # cv_gcs_object_name_to_save remains current_user.cv_filename
+                            except Exception as e_upload_unexpected:
+                                print(f"ERROR: Unexpected error during new CV GCS upload '{new_cv_gcs_object_name}'. Error: {e_upload_unexpected}")
+                                flash('An unexpected error occurred during CV upload. Previous CV (if any) is retained.', 'danger')
+                                # cv_gcs_object_name_to_save remains current_user.cv_filename
+                else: # No new CV file was submitted in the form
+                    cv_gcs_object_name_to_save = current_user.cv_filename # Keep existing filename
 
             current_user.first_name = form.first_name.data
             current_user.last_name = form.last_name.data
-            current_user.target_career_path = form.target_career_path.data
+            current_user.target_career_path = form.target_career_path.data # This should be object, not id
             current_user.current_role = form.current_role.data
             current_user.employment_status = form.employment_status.data
             current_user.time_commitment = form.time_commitment.data
             current_user.interests = form.interests.data
             current_user.learning_style = form.learning_style.data if form.learning_style.data else None
-            current_user.cv_filename = cv_gcs_object_name
+            current_user.cv_filename = cv_gcs_object_name_to_save # Save the GCS object name
+            current_user.target_career_path = form.target_career_path.data # This should be object, not id
+            current_user.current_role = form.current_role.data
+            current_user.employment_status = form.employment_status.data
+            current_user.time_commitment = form.time_commitment.data
+            current_user.interests = form.interests.data
+            current_user.learning_style = form.learning_style.data if form.learning_style.data else None
+            current_user.cv_filename = cv_gcs_object_name_to_save # Save the GCS object name
 
             current_user.onboarding_complete = True
 
@@ -1634,33 +1794,49 @@ def download_cv():
     """Generates a signed URL to download the user's CV from GCS."""
     gcs_object_name = current_user.cv_filename
     if not gcs_object_name:
-        flash("No CV uploaded.", "warning")
+        flash("No CV has been uploaded yet.", "warning")
+        return redirect(url_for('profile'))
+
+    if not storage_client:
+        print(f"ERROR: GCS client not available in download_cv for CV {gcs_object_name}. Download link generation failed.")
+        flash('Cloud storage service is currently unavailable. Could not generate CV download link.', 'danger')
+        return redirect(url_for('profile'))
+
+    bucket_name = current_app.config.get('GCS_BUCKET_NAME')
+    if not bucket_name:
+        print(f"ERROR: GCS_BUCKET_NAME not configured in download_cv for CV {gcs_object_name}. Download link generation failed.")
+        flash('Cloud storage is not properly configured. Could not generate CV download link.', 'danger')
         return redirect(url_for('profile'))
 
     try:
-        bucket_name = current_app.config.get('GCS_BUCKET_NAME')
-        if not bucket_name: raise ValueError("GCS Bucket Name not configured")
         bucket = storage_client.bucket(bucket_name)
         blob = bucket.blob(gcs_object_name)
 
+        print(f"INFO: Checking existence of CV object {gcs_object_name} in bucket {bucket_name} for download.")
         if not blob.exists():
-            flash("Error: Your CV file was not found in storage. Please upload it again.", "danger")
-            # Optionally clear the bad filename from DB
-            # current_user.cv_filename = None; db.session.commit()
+            print(f"ERROR: CV file not found in GCS: {gcs_object_name}. Cannot generate download link.")
+            flash("Error: Your CV file was not found in cloud storage. Please upload it again.", "danger")
+            # Optionally clear the bad filename from DB to prevent further errors
+            # current_user.cv_filename = None
+            # db.session.commit()
             return redirect(url_for('profile'))
 
-        # Generate a signed URL valid for 15 minutes
+        print(f"INFO: Generating signed URL for CV: {gcs_object_name}, Bucket: {bucket_name}")
         signed_url = blob.generate_signed_url(
             version="v4",
-            expiration=timedelta(minutes=15),
+            expiration=timedelta(minutes=15), # Short-lived URL
             method="GET"
         )
-        print(f"DEBUG: Generated GCS signed URL for CV: {signed_url}")
-        return redirect(signed_url) # Redirect browser to the GCS URL
+        print(f"INFO: Successfully generated signed URL for CV: {gcs_object_name}")
+        return redirect(signed_url)
 
-    except Exception as e:
-        print(f"Error generating signed URL for CV {gcs_object_name}: {e}")
-        flash("Could not generate download link for CV.", "danger")
+    except google_exceptions.GoogleCloudError as e_gcs:
+        print(f"ERROR: GCS operation failed while trying to generate download link for CV '{gcs_object_name}'. Bucket: '{bucket_name}'. Error: {e_gcs}")
+        flash('Could not generate CV download link due to a cloud storage error. Please try again.', 'danger')
+        return redirect(url_for('profile'))
+    except Exception as e_unexpected:
+        print(f"ERROR: Unexpected error generating signed URL for CV '{gcs_object_name}'. Error: {e_unexpected}")
+        flash('An unexpected error occurred while preparing the CV download link. Please try again.', 'danger')
         return redirect(url_for('profile'))
 
 # --- NEW CV Delete Route ---
@@ -1670,36 +1846,60 @@ def delete_cv():
     """Deletes the user's uploaded CV from GCS and DB."""
     gcs_object_name = current_user.cv_filename
     if not gcs_object_name:
-        flash("No CV to delete.", "info")
+        flash("No CV uploaded to delete.", "info")
         return redirect(url_for('profile'))
 
-    try:
-        # Attempt to delete from GCS first
+    gcs_delete_successful = False
+    if not storage_client:
+        print(f"ERROR: GCS client not available in delete_cv for CV {gcs_object_name}. Deletion from GCS skipped.")
+        flash("Cloud storage service is currently unavailable. CV file might not be deleted from storage.", "warning")
+        # Proceed to clear DB ref as per original logic, but GCS state is unknown/failed.
+    else:
+        bucket_name = current_app.config.get('GCS_BUCKET_NAME')
+        if not bucket_name:
+            print(f"ERROR: GCS_BUCKET_NAME not configured in delete_cv for CV {gcs_object_name}. Deletion from GCS skipped.")
+            flash("Cloud storage is not properly configured. CV file might not be deleted from storage.", "warning")
+            # Proceed to clear DB ref.
+        else:
+            try:
+                print(f"INFO: Attempting to delete CV from GCS: {gcs_object_name}, Bucket: {bucket_name}")
+                bucket = storage_client.bucket(bucket_name)
+                blob = bucket.blob(gcs_object_name)
+                if blob.exists(): # Check existence before deleting
+                    blob.delete()
+                    print(f"INFO: Successfully deleted CV from GCS: {gcs_object_name}")
+                    gcs_delete_successful = True # Mark GCS deletion as successful
+                else:
+                    print(f"INFO: CV file not found in GCS, no deletion needed: {gcs_object_name}")
+                    gcs_delete_successful = True # No file was there, so effectively "deleted" or "not present"
+            except google_exceptions.GoogleCloudError as e_gcs:
+                print(f"ERROR: GCS failed to delete CV '{gcs_object_name}'. Bucket: '{bucket_name}'. Error: {e_gcs}")
+                flash("Failed to delete CV from cloud storage due to a storage error. The reference will be removed, but the file might persist.", "warning")
+                # gcs_delete_successful remains False
+            except Exception as e_unexpected:
+                print(f"ERROR: Unexpected error deleting CV '{gcs_object_name}' from GCS. Error: {e_unexpected}")
+                flash("An unexpected error occurred while deleting the CV from cloud storage.", "warning")
+                # gcs_delete_successful remains False
+
+    # Clear filename reference in database regardless of GCS outcome,
+    # unless a more strict policy is desired (e.g., only clear if GCS delete confirmed).
+    # Current logic: always clear DB ref, flash warning if GCS part failed.
+    # However, it's better to only clear DB if GCS operation was successful or not applicable (e.g. file not found in GCS)
+    if gcs_delete_successful:
         try:
-            bucket_name = current_app.config.get('GCS_BUCKET_NAME')
-            if not bucket_name: raise ValueError("GCS Bucket Name not configured")
-            bucket = storage_client.bucket(bucket_name)
-            blob = bucket.blob(gcs_object_name)
-            if blob.exists():
-                blob.delete()
-                print(f"Deleted CV from GCS: {gcs_object_name}")
-            else:
-                print(f"CV file not found in GCS, clearing DB record: {gcs_object_name}")
-        except Exception as e_gcs:
-            # Log error but proceed to clear DB ref anyway? Or stop?
-            # Let's log and proceed to clear DB ref to avoid orphaned refs
-            print(f"Error deleting CV from GCS {gcs_object_name}: {e_gcs}")
-            flash("Could not delete file from storage, but removing reference.", "warning")
+            current_user.cv_filename = None
+            db.session.commit()
+            flash("CV deleted successfully.", "success")
+        except Exception as e_db:
+            db.session.rollback()
+            print(f"ERROR: Failed to clear CV filename in DB for user {current_user.id} after GCS delete. Error: {e_db}")
+            flash("CV removed from storage, but failed to update profile. Please contact support.", "danger")
+    else:
+        # If GCS deletion wasn't successful, don't change the DB record.
+        # The previous flash messages should inform the user of the GCS issue.
+        # flash("CV could not be deleted from cloud storage. Profile not updated.", "danger") # Already flashed
+        pass
 
-        # Clear filename reference in database
-        current_user.cv_filename = None
-        db.session.commit()
-        flash("CV deleted successfully.", "success")
-
-    except Exception as e:
-        db.session.rollback()
-        print(f"Error clearing CV filename in DB for user {current_user.id}: {e}")
-        flash("An error occurred while removing the CV reference.", "danger")
 
     return redirect(url_for('profile'))
 
@@ -1850,6 +2050,74 @@ def reset_token(token):
 
     is_homepage_layout = not current_user.is_authenticated
     return render_template('reset_password.html', title='Reset Password', form=form, token=token, is_homepage=is_homepage_layout)
+
+# --- NEW GCS Health Check Endpoint ---
+@app.route('/health/gcs', methods=['GET'])
+def gcs_health_check():
+    """
+    Performs a health check on the Google Cloud Storage (GCS) connection and bucket configuration.
+    """
+    if storage_client is None:
+        print("ERROR: GCS health check failed - storage_client is None.")
+        return jsonify({
+            'status': 'error',
+            'message': 'GCS client not initialized',
+            'details': 'The storage_client is None.'
+        }), 500
+
+    bucket_name = current_app.config.get('GCS_BUCKET_NAME')
+    if not bucket_name:
+        print("ERROR: GCS health check failed - GCS_BUCKET_NAME is not configured.")
+        return jsonify({
+            'status': 'error',
+            'message': 'GCS bucket name not configured',
+            'details': 'GCS_BUCKET_NAME is not set.'
+        }), 500
+
+    try:
+        print(f"INFO: GCS health check: Attempting to get bucket '{bucket_name}'.")
+        bucket = storage_client.get_bucket(bucket_name) # This checks if the bucket exists and if client has permissions
+        print(f"INFO: GCS health check: Successfully retrieved bucket '{bucket_name}'. Location: {bucket.location}, ProjectNumber: {bucket.project_number}")
+        return jsonify({
+            'status': 'ok',
+            'message': 'GCS connection successful and bucket found.',
+            'bucket_name': bucket_name,
+            'bucket_location': bucket.location,
+            'bucket_project_number': bucket.project_number
+        }), 200
+    except google_exceptions.NotFound:
+        print(f"ERROR: GCS health check: Bucket '{bucket_name}' not found.")
+        return jsonify({
+            'status': 'error',
+            'message': 'GCS bucket not found.',
+            'bucket_name': bucket_name,
+            'details': 'The configured GCS bucket does not exist.'
+        }), 404
+    except google_exceptions.Forbidden as e:
+        print(f"ERROR: GCS health check: Permission denied for bucket '{bucket_name}'. Error: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': 'GCS permission denied for bucket.',
+            'bucket_name': bucket_name,
+            'details': f'Permission denied when trying to access GCS bucket: {e}'
+        }), 403
+    except google_exceptions.GoogleCloudError as e:
+        print(f"ERROR: GCS health check: A GCS operation failed for bucket '{bucket_name}'. Error: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': 'GCS operation failed.',
+            'bucket_name': bucket_name,
+            'details': f'An error occurred while trying to access GCS bucket: {e}'
+        }), 500
+    except Exception as e:
+        print(f"ERROR: GCS health check: An unexpected error occurred. Bucket: '{bucket_name}'. Error: {e}")
+        # It's good to log the bucket_name here too, if available, for context.
+        return jsonify({
+            'status': 'error',
+            'message': 'An unexpected error occurred during GCS health check.',
+            'bucket_name': bucket_name if 'bucket_name' in locals() else 'Unknown', # Ensure bucket_name is defined for this log
+            'details': str(e)
+        }), 500
 
 # --- Main execution ---
 if __name__ == '__main__':
